@@ -1,0 +1,12 @@
+# データベースとアップロード画像（本番環境と同期・上書きさせないための除外設定）
+database/sake_database.db
+uploaded_images/*
+!uploaded_images/.gitkeep
+
+# キャッシュ・一時ファイル
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+.vscode/
+.idea/

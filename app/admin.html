@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理者ダッシュボード | JAPANESE SAKE DATABASE ADMIN</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #0a0c10;
+            --bg-card: #12161f;
+            --bg-hover: #1b212d;
+            --border-color: #2a3242;
+            --accent-gold: #d4af37;
+            --accent-gold-light: #f5e08c;
+            --accent-emerald: #10b981;
+            --accent-blue: #3b82f6;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding-bottom: 3rem;
+        }
+
+        header {
+            background: rgba(18, 22, 31, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.2rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-gold) 0%, var(--accent-gold-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .nav-btn {
+            background: var(--bg-card);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-btn:hover {
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+        }
+
+        .tab-nav {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.8rem 1.4rem;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+            color: var(--accent-gold);
+            border-bottom-color: var(--accent-gold);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 1.8rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--accent-gold);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.4rem;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            background: #19202c;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--accent-gold);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 90px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-gold) 0%, #b8860b 100%);
+            color: #1a1a1a;
+            border: none;
+            padding: 0.8rem 1.6rem;
+            border-radius: 10px;
+            font-weight: 800;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(212, 175, 55, 0.25);
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(212, 175, 55, 0.35);
+        }
+
+        .dropzone-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .dropzone-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .dropzone {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.02);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .dropzone:hover {
+            border-color: var(--accent-gold);
+            background: rgba(212, 175, 55, 0.05);
+        }
+
+        .preview-img {
+            max-width: 140px;
+            max-height: 140px;
+            border-radius: 8px;
+            margin-top: 0.8rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .result-preview {
+            background: #18202d;
+            border-left: 4px solid var(--accent-gold);
+            padding: 1.2rem;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+        }
+
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #19202c;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-top: 4px;
+        }
+
+        .search-item {
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            font-size: 0.88rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .search-item:hover {
+            background: var(--bg-hover);
+            color: var(--accent-gold);
+        }
+
+        .profiles-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.2rem;
+        }
+
+        .profile-card {
+            background: #171d27;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.2rem;
+            position: relative;
+        }
+
+        .profile-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(212, 175, 55, 0.2);
+            color: var(--accent-gold);
+            font-size: 0.75rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
+<div id="authHeaderBar" style="background: rgba(20, 29, 47, 0.95); border-bottom: 1px solid rgba(212, 175, 55, 0.2); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; backdrop-filter: blur(10px);">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+        <span style="font-weight: 700; color: #d4af37; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+            🍶 日本酒DB
+        </span>
+        <span id="userRoleBadge" style="background: rgba(212, 175, 55, 0.15); color: #f3e5ab; border: 1px solid rgba(212, 175, 55, 0.3); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 500;">
+            👤 一般利用者 (未ログイン)
+        </span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <div id="authNavButtons"></div>
+        <span id="userInfoText" style="font-size: 0.9rem; color: #9ca3af;">
+            ログイン中: 未設定
+        </span>
+        <button onclick="openLoginModal()" style="background: linear-gradient(135deg, #d4af37, #aa820a); color: #000; border: none; padding: 0.45rem 1.1rem; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.85rem; box-shadow: 0 2px 8px rgba(212,175,55,0.3);">
+            🔑 ログイン / アカウント切替
+        </button>
+    </div>
+</div>
+
+<!-- 🔐 簡易ログインモーダル -->
+<div id="loginModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 2000; align-items: center; justify-content: center; padding: 1rem;">
+    <div style="background: #141d2f; border: 1px solid rgba(212, 175, 55, 0.4); border-radius: 16px; max-width: 500px; width: 100%; padding: 2rem; box-shadow: 0 20px 50px rgba(0,0,0,0.6); color: #fff;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; border-bottom: 1px solid #1f293d; padding-bottom: 0.8rem;">
+            <h3 style="font-size: 1.3rem; color: #d4af37; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+                🔐 ログイン / アカウント切替
+            </h3>
+            <button onclick="closeLoginModal()" style="background: none; border: none; color: #9ca3af; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+
+        <p style="font-size: 0.85rem; color: #9ca3af; margin-bottom: 1rem;">テスト用アカウントをワンクリック選択するか、ID/PWを入力してください：</p>
+        
+        <!-- ワンクリック アカウント選択ボタン -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1.2rem;">
+            <button type="button" onclick="selectQuickAccount('hitoshi', 'password')" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #93c5fd; padding: 0.5rem 0.3rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; text-align: center;">
+                <strong>👤 hitoshi</strong><br><small style="opacity:0.8">一般利用者</small>
+            </button>
+            <button type="button" onclick="selectQuickAccount('nao', 'password')" style="background: rgba(236, 72, 153, 0.2); border: 1px solid rgba(236, 72, 153, 0.5); color: #fbcfe8; padding: 0.5rem 0.3rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; text-align: center;">
+                <strong>🌸 nao</strong><br><small style="opacity:0.8">一般利用者</small>
+            </button>
+            <button type="button" onclick="selectQuickAccount('user2', 'password')" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #6ee7b7; padding: 0.5rem 0.3rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; text-align: center;">
+                <strong>👤 user2</strong><br><small style="opacity:0.8">一般利用者</small>
+            </button>
+            <button type="button" onclick="selectQuickAccount('user3', 'password')" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); color: #93c5fd; padding: 0.5rem 0.3rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; text-align: center;">
+                <strong>👤 user3</strong><br><small style="opacity:0.8">一般利用者</small>
+            </button>
+            <button type="button" onclick="selectQuickAccount('dassai_admin', 'password')" style="background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.4); color: #c4b5fd; padding: 0.5rem 0.3rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; text-align: center;">
+                <strong>🍶 酒蔵(獺祭)</strong><br><small style="opacity:0.8">旭酒造</small>
+            </button>
+            <button type="button" onclick="selectQuickAccount('hakkai_admin', 'password')" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fef3c7; padding: 0.5rem 0.3rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; text-align: center;">
+                <strong>🍶 酒蔵(八海山)</strong><br><small style="opacity:0.8">八海醸造</small>
+            </button>
+            <button type="button" onclick="selectQuickAccount('admin', 'password')" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #fca5a5; padding: 0.5rem 0.3rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; text-align: center;">
+                <strong>👑 admin</strong><br><small style="opacity:0.8">システム管理者</small>
+            </button>
+            <button type="button" onclick="selectQuickAccount('user1', 'password')" style="background: rgba(212, 175, 55, 0.15); border: 1px solid rgba(212, 175, 55, 0.4); color: #f3e5ab; padding: 0.5rem 0.3rem; border-radius: 8px; font-size: 0.75rem; cursor: pointer; text-align: center;">
+                <strong>👤 user1</strong><br><small style="opacity:0.8">一般利用者</small>
+            </button>
+        </div>
+
+        <form onsubmit="handleLoginSubmit(event)">
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; font-size: 0.85rem; color: #9ca3af; margin-bottom: 0.3rem;">ユーザーID</label>
+                <input type="text" id="loginUserId" required placeholder="admin / user1 等" style="width: 100%; background: #0b0f19; border: 1px solid #1f293d; color: #fff; padding: 0.75rem; border-radius: 8px; font-size: 0.95rem;">
+            </div>
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: block; font-size: 0.85rem; color: #9ca3af; margin-bottom: 0.3rem;">パスワード</label>
+                <input type="password" id="loginPassword" required placeholder="••••••••" style="width: 100%; background: #0b0f19; border: 1px solid #1f293d; color: #fff; padding: 0.75rem; border-radius: 8px; font-size: 0.95rem;">
+            </div>
+            <div id="loginErrorMessage" style="color: #ef4444; font-size: 0.85rem; margin-bottom: 1rem; display: none;"></div>
+            <button type="submit" style="width: 100%; background: linear-gradient(135deg, #d4af37, #aa820a); color: #000; border: none; padding: 0.85rem; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer;">
+                🔓 ログイン
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+let currentUser = null;
+
+function initAuth() {
+    const saved = localStorage.getItem('sake_user_session');
+    if (saved) {
+        try {
+            currentUser = JSON.parse(saved);
+        } catch(e){}
+    }
+    if (!currentUser) {
+        currentUser = { user_id: 'hitoshi', user_name: 'hitoshi', role: 'system_admin', assigned_brewery: null };
+        localStorage.setItem('sake_user_session', JSON.stringify(currentUser));
+    }
+    updateAuthUI();
+}
+
+function updateAuthUI() {
+    const roleBadge = document.getElementById('userRoleBadge');
+    const userText = document.getElementById('userInfoText');
+    if (!currentUser) return;
+
+    let roleName = '一般利用者';
+    if (currentUser.role === 'system_admin') roleName = '👑 システム管理者';
+    else if (currentUser.role === 'brewery_admin') roleName = `🍶 酒蔵管理者 (${currentUser.assigned_brewery || '自社'})`;
+
+    if (roleBadge) roleBadge.innerText = `${currentUser.user_name} [${roleName}]`;
+    if (userText) userText.innerText = `ログイン中: ${currentUser.user_name}`;
+    
+    // レビュー投稿モーダルの投稿者名を自動セット
+    const modalUserNameInput = document.getElementById('editUserName');
+    if (modalUserNameInput) {
+        modalUserNameInput.value = currentUser.user_name;
+    }
+    
+    // admin.html アクセス制御チェック呼び出し
+    if (window.location.pathname.includes('admin') && typeof checkAdminAccessPermission === 'function') {
+        checkAdminAccessPermission();
+    }
+}
+
+function openLoginModal() {
+    document.getElementById('loginModal').style.display = 'flex';
+    const lastId = localStorage.getItem('last_login_user_id') || currentUser.user_id || 'hitoshi';
+    const lastPw = localStorage.getItem('last_login_password') || 'password';
+    document.getElementById('loginUserId').value = lastId;
+    document.getElementById('loginPassword').value = lastPw;
+}
+
+function closeLoginModal() {
+    document.getElementById('loginModal').style.display = 'none';
+}
+
+function selectQuickAccount(userId, password) {
+    document.getElementById('loginUserId').value = userId;
+    document.getElementById('loginPassword').value = password;
+    performLogin(userId, password);
+}
+
+function handleLoginSubmit(e) {
+    e.preventDefault();
+    const uid = document.getElementById('loginUserId').value;
+    const pwd = document.getElementById('loginPassword').value;
+    performLogin(uid, pwd);
+}
+
+async function performLogin(userId, password) {
+    const errDiv = document.getElementById('loginErrorMessage');
+    errDiv.style.display = 'none';
+
+    try {
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ user_id: userId, password: password })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            currentUser = data.user;
+            localStorage.setItem('sake_user_session', JSON.stringify(currentUser));
+            localStorage.setItem('last_login_user_id', userId);
+            localStorage.setItem('last_login_password', password);
+            updateAuthUI();
+            closeLoginModal();
+        } else {
+            errDiv.innerText = data.message || 'ログインに失敗しました';
+            errDiv.style.display = 'block';
+        }
+    } catch(e) {
+        errDiv.innerText = '通信エラーが発生しました';
+        errDiv.style.display = 'block';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initAuth);
+</script>
+
+
+    <header>
+        <h1>⚙️ JAPANESE SAKE ADMIN DASHBOARD</h1>
+        <div class="header-nav">
+            <a href="/" class="nav-btn">🍶 日本酒Viewerに戻る</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="switchTab('tab-gen', event)">✨ AI口コミ＆2枚写真自動生成</button>
+            <button class="tab-btn" onclick="switchTab('tab-csv', event)">📥 スペックCSVインポート</button>
+            <button class="tab-btn" onclick="switchTab('tab-profiles', event)">👤 ペルソナ・プロフィール管理</button>
+        </div>
+
+        <!-- TAB 1: AI口コミ＆写真自動生成 -->
+        <div id="tab-gen" class="tab-content active">
+            <div class="card">
+                <div class="card-title">📸 写真2枚からのAIリアル口コミ生成</div>
+                <div style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">
+                    最大2枚の実写写真（ボトル正面、裏ラベル・ペアリング料理など）をアップロードし、ペルソナを選択するだけでAIがレビューコメント・評点を自動生成します。
+                </div>
+
+                <form id="aiGenForm">
+                    <div class="form-group">
+                        <label class="form-label">対象の日本酒を検索・選択</label>
+                        <input type="text" class="form-input" id="sakeSearchInput" placeholder="銘柄名や酒蔵名を入力（例: みむろ杉、新政...）" autocomplete="off">
+                        <input type="hidden" id="selectedProductId">
+                        <div class="search-results" id="sakeSearchResults" style="display: none;"></div>
+                        <div id="selectedSakeBadge" style="margin-top: 0.5rem; font-weight: 700; color: var(--accent-gold);"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">投稿ペルソナ（投稿者アカウント）</label>
+                        <select class="form-select" id="personaSelect"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">実写写真（最大2枚登録可能）</label>
+                        <div class="dropzone-grid">
+                            <div class="dropzone" id="photoDropzone1" onclick="document.getElementById('photoFileInput1').click()">
+                                <div style="font-weight: 700; font-size: 0.85rem; color: var(--accent-gold); margin-bottom: 0.4rem;">📷 画像 1 (メイン写真 / ボトル正面)</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">ファイル選択またはドラッグ</div>
+                                <input type="file" id="photoFileInput1" accept="image/*" style="display: none;">
+                                <img id="photoPreview1" class="preview-img" style="display: none;">
+                            </div>
+
+                            <div class="dropzone" id="photoDropzone2" onclick="document.getElementById('photoFileInput2').click()">
+                                <div style="font-weight: 700; font-size: 0.85rem; color: var(--accent-gold); margin-bottom: 0.4rem;">📷 画像 2 (サブ写真 / 裏ラベル・料理など)</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">ファイル選択またはドラッグ</div>
+                                <input type="file" id="photoFileInput2" accept="image/*" style="display: none;">
+                                <img id="photoPreview2" class="preview-img" style="display: none;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">追加メモ / シチュエーション（任意）</label>
+                        <input type="text" class="form-input" id="customNotes" placeholder="例: 居酒屋で刺身と合わせた、冷酒で試飲した">
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="genSubmitBtn">✨ AI口コミ ＆ 2枚写真コメントを自動生成</button>
+                </form>
+
+                <div id="genResult" class="result-preview" style="display: none;">
+                    <div style="font-weight: 700; color: var(--accent-gold); margin-bottom: 0.6rem; font-size: 1.05rem;">🎉 口コミの自動生成が完了しました！</div>
+                    <div id="resultDetails" style="font-size: 0.9rem; line-height: 1.6;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: スペックCSVインポート -->
+        <div id="tab-csv" class="tab-content">
+            <div class="card">
+                <div class="card-title">📥 スペックデータCSV一括インポート</div>
+                <div style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">
+                    CSVファイルから日本酒のスペック（特定名称、アルコール度数、精米歩合、使用米、酵母、日本酒度、JANコード等）を一括取り込み・データベース反映します。
+                </div>
+
+                <form id="csvImportForm">
+                    <div class="form-group">
+                        <label class="form-label">CSVファイルを選択 (UTF-8 / Shift_JIS対応)</label>
+                        <div class="dropzone" onclick="document.getElementById('csvFileInput').click()">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📄</div>
+                            <div>クリックしてCSVファイルを選択</div>
+                            <input type="file" id="csvFileInput" accept=".csv" style="display: none;">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">またはCSVテキストを直接貼り付け</label>
+                        <textarea class="form-textarea" id="csvTextInput" placeholder="id,brand_name,brewery_name,category,alcohol,polish_ratio,ingredients,rice_variety,yeast,smv,acidity,amino_acidity,jan_code&#10;29,みむろ杉,今西酒造,純米吟醸,15,60%,米・米麹,山田錦,901,3.0,1.4,1.1,4900000000000" style="min-height: 150px; font-family: monospace;"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="csvSubmitBtn">📥 スペックCSVを一括インポート実行</button>
+                </form>
+
+                <div id="csvResult" class="result-preview" style="display: none;">
+                    <div style="font-weight: 700; color: var(--accent-emerald); margin-bottom: 0.6rem; font-size: 1.05rem;" id="csvResultTitle">🎉 CSVインポート成功</div>
+                    <div id="csvResultDetails" style="font-size: 0.9rem; line-height: 1.6;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: ペルソナ・プロフィール管理 -->
+        <div id="tab-profiles" class="tab-content">
+            <div class="card">
+                <div class="card-title">👤 ペルソナ・プロフィール一覧 ＆ 編集</div>
+                <div style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1.5rem;">
+                    口コミ生成に使用するペルソナ（あなた自身・協力者アカウント）の文体や好みの傾向を設定します。
+                </div>
+                <div class="profiles-grid" id="profilesGrid"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-title" id="profileFormTitle">✏️ ペルソナの新規作成 / 編集</div>
+                <form id="profileForm">
+                    <input type="hidden" id="profUserNameOriginal">
+                    <div class="form-group">
+                        <label class="form-label">ユーザー名 (ID)</label>
+                        <input type="text" class="form-input" id="profUserName" placeholder="例: hitocie, sommelier_yamada">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">表示名 (Display Name)</label>
+                        <input type="text" class="form-input" id="profDisplayName" placeholder="例: hitocie (あなた)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">アイコン絵文字</label>
+                        <input type="text" class="form-input" id="profAvatar" placeholder="👤">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">好みの傾向・視点 (Preference Prompt)</label>
+                        <textarea class="form-textarea" id="profPreference" placeholder="例: 華やかな香りの純米大吟醸や辛口生酒が好き。"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">レビュー文体・口調指示 (Writing Style Prompt)</label>
+                        <textarea class="form-textarea" id="profStyle" placeholder="例: 親しみやすく丁寧な口調。「〜ですね」「〜を感じました」"></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">💾 プロフィールを保存する</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allProducts = [];
+        let profiles = [];
+        let base64Photo1 = null;
+        let base64Photo2 = null;
+
+        function switchTab(tabId, evt) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            if (evt && evt.target) {
+                evt.target.classList.add('active');
+            }
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProducts();
+            loadProfiles();
+            setupSearch();
+            setupDropzone();
+            setupCsvImport();
+        });
+
+        function loadProducts() {
+            fetch('/api/products')
+                .then(res => res.json())
+                .then(data => {
+                    allProducts = data;
+                });
+        }
+
+        function loadProfiles() {
+            fetch('/api/admin/profiles')
+                .then(res => res.json())
+                .then(data => {
+                    profiles = data;
+                    renderProfiles();
+                    renderPersonaSelect();
+                });
+        }
+
+        function renderProfiles() {
+            const grid = document.getElementById('profilesGrid');
+            grid.innerHTML = profiles.map(p => `
+                <div class="profile-card">
+                    ${p.is_primary ? '<span class="profile-badge">メイン (あなた)</span>' : ''}
+                    <div style="font-size: 1.4rem; margin-bottom: 0.4rem;">${p.avatar_icon || '👤'} ${p.display_name}</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.6rem;">ID: ${p.user_name}</div>
+                    <div style="font-size: 0.85rem; line-height: 1.5; margin-bottom: 0.8rem;">
+                        <strong>好み:</strong> ${p.preference_text || '未設定'}
+                    </div>
+                    <button class="nav-btn" style="font-size: 0.75rem;" onclick="editProfile('${p.user_name}')">✏️ 編集</button>
+                </div>
+            `).join('');
+        }
+
+        function renderPersonaSelect() {
+            const select = document.getElementById('personaSelect');
+            select.innerHTML = profiles.map(p => `
+                <option value="${p.user_name}">${p.avatar_icon || '👤'} ${p.display_name}</option>
+            `).join('');
+        }
+
+        function setupSearch() {
+            const input = document.getElementById('sakeSearchInput');
+            const results = document.getElementById('sakeSearchResults');
+
+            input.addEventListener('input', () => {
+                const val = input.value.trim().toLowerCase();
+                if (!val) {
+                    results.style.display = 'none';
+                    return;
+                }
+                const filtered = allProducts.filter(p => 
+                    (p.name && p.name.toLowerCase().includes(val)) || 
+                    (p.sub_name && p.sub_name.toLowerCase().includes(val)) ||
+                    (p.brewery && p.brewery.toLowerCase().includes(val))
+                ).slice(0, 10);
+
+                if (filtered.length > 0) {
+                    results.style.display = 'block';
+                    results.innerHTML = filtered.map(p => `
+                        <div class="search-item" onclick="selectProduct(${p.id}, '${p.name}', '${p.brewery || ''}')">
+                            <strong>${p.name}</strong> ${p.sub_name ? '(' + p.sub_name + ')' : ''} <span style="color:var(--text-muted); font-size:0.8rem;">${p.brewery || ''}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    results.style.display = 'none';
+                }
+            });
+        }
+
+        window.selectProduct = function(id, name, brewery) {
+            document.getElementById('selectedProductId').value = id;
+            document.getElementById('selectedSakeBadge').textContent = `選択中: ID ${id} - ${name} (${brewery})`;
+            document.getElementById('sakeSearchResults').style.display = 'none';
+        };
+
+        function setupDropzone() {
+            const fileInput1 = document.getElementById('photoFileInput1');
+            const preview1 = document.getElementById('photoPreview1');
+            const fileInput2 = document.getElementById('photoFileInput2');
+            const preview2 = document.getElementById('photoPreview2');
+
+            fileInput1.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        base64Photo1 = evt.target.result;
+                        preview1.src = base64Photo1;
+                        preview1.style.display = 'inline-block';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            fileInput2.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        base64Photo2 = evt.target.result;
+                        preview2.src = base64Photo2;
+                        preview2.style.display = 'inline-block';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        function setupCsvImport() {
+            const fileInput = document.getElementById('csvFileInput');
+            const textArea = document.getElementById('csvTextInput');
+            const form = document.getElementById('csvImportForm');
+            const submitBtn = document.getElementById('csvSubmitBtn');
+            const resultDiv = document.getElementById('csvResult');
+            const resultDetails = document.getElementById('csvResultDetails');
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        textArea.value = evt.target.result;
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                }
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const text = textArea.value.trim();
+                if (!text) {
+                    alert('CSVテキストまたはファイルを入力してください。');
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = '📥 スペックCSVインポート処理中...';
+
+                fetch('/api/product/import-csv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ csv_text: text })
+                })
+                .then(res => res.json())
+                .then(res => {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '📥 スペックCSVを一括インポート実行';
+
+                    if (res.status === 'success') {
+                        resultDiv.style.display = 'block';
+                        resultDetails.innerHTML = `インポート成功: <strong>${res.updated} 件</strong> のスペックデータを更新いたしました。（スキップ/エラー: ${res.skipped} 件）`;
+                        loadProducts();
+                    } else {
+                        alert('インポートエラー: ' + res.message);
+                    }
+                })
+                .catch(err => {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '📥 スペックCSVを一括インポート実行';
+                    alert('通信エラーが発生しました。');
+                });
+            });
+        }
+
+        document.getElementById('aiGenForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const productId = document.getElementById('selectedProductId').value;
+            const userName = document.getElementById('personaSelect').value;
+            const notes = document.getElementById('customNotes').value;
+            const submitBtn = document.getElementById('genSubmitBtn');
+            const resultDiv = document.getElementById('genResult');
+            const resultDetails = document.getElementById('resultDetails');
+
+            if (!productId) {
+                alert('対象の日本酒を選択してください。');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = '✨ AIがリアルな口コミを創出中...';
+
+            fetch('/api/admin/generate-comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    product_id: parseInt(productId),
+                    user_name: userName,
+                    rating_image: base64Photo1,
+                    rating_image_2: base64Photo2,
+                    custom_notes: notes
+                })
+            })
+            .then(res => res.json())
+            .then(res => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '✨ AI口コミ ＆ 2枚写真コメントを自動生成';
+
+                if (res.status === 'success') {
+                    const d = res.data;
+                    resultDiv.style.display = 'block';
+                    resultDetails.innerHTML = `
+                        <div style="margin-bottom:0.5rem;"><strong>投稿コメント:</strong> ${d.comment}</div>
+                        <div style="display:flex; gap:1rem; flex-wrap:wrap; color:var(--accent-gold);">
+                            <span>★ 総合: ${d.total_score}</span>
+                            <span>タイプ: ${d.ssi_type}</span>
+                            <span>味わい: ${d.body_level}</span>
+                            <span>香り: ${d.aroma_level}</span>
+                        </div>
+                    `;
+                    loadProducts();
+                } else {
+                    alert('エラー: ' + res.error);
+                }
+            })
+            .catch(err => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '✨ AI口コミ ＆ 2枚写真コメントを自動生成';
+                alert('通信エラーが発生しました。');
+            });
+        });
+
+        window.editProfile = function(userName) {
+            const p = profiles.find(x => x.user_name === userName);
+            if (p) {
+                document.getElementById('profUserNameOriginal').value = p.user_name;
+                document.getElementById('profUserName').value = p.user_name;
+                document.getElementById('profDisplayName').value = p.display_name;
+                document.getElementById('profAvatar').value = p.avatar_icon || '👤';
+                document.getElementById('profPreference').value = p.preference_text || '';
+                document.getElementById('profStyle').value = p.writing_style || '';
+                document.getElementById('profileFormTitle').textContent = `✏️ ペルソナ編集: ${p.display_name}`;
+            }
+        };
+
+        document.getElementById('profileForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const payload = {
+                user_name: document.getElementById('profUserName').value,
+                display_name: document.getElementById('profDisplayName').value,
+                avatar_icon: document.getElementById('profAvatar').value,
+                preference_text: document.getElementById('profPreference').value,
+                writing_style: document.getElementById('profStyle').value
+            };
+
+            fetch('/api/admin/profiles/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('プロフィールを保存しました。');
+                    loadProfiles();
+                }
+            });
+        });
+    </script>
+
+<script>
+function checkAdminAccessPermission() {
+    const saved = localStorage.getItem('sake_user_session');
+    let u = null;
+    if (saved) {
+        try { u = JSON.parse(saved); } catch(e){}
+    }
+    if (!u) {
+        alert('ログインが必要です');
+        window.location.href = '/';
+        return;
+    }
+    if (u.role === 'user') {
+        alert('⚠️ 管理者権限が必要です（システム管理者アカウントでログインしてください）。');
+        window.location.href = '/';
+        return;
+    }
+    if (u.role === 'brewery_admin') {
+        // 酒蔵管理者は専用画面 brewery_admin.html へリダイレクト
+        window.location.href = '/brewery_admin.html';
+        return;
+    }
+}
+document.addEventListener('DOMContentLoaded', checkAdminAccessPermission);
+</script>
+
+
+<script>
+function updateNavLinksForRole() {
+    const saved = localStorage.getItem('sake_user_session');
+    if (!saved) return;
+    let u = null;
+    try { u = JSON.parse(saved); } catch(e){}
+    if (!u) return;
+
+    const navContainer = document.getElementById('authNavButtons');
+    if (!navContainer) return;
+
+    let navHtml = '';
+    if (u.role === 'system_admin') {
+        navHtml = '<a href="/admin.html" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); padding: 0.35rem 0.8rem; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem;">👑 システム管理画面</a>';
+        navHtml += '<a href="/brewery_admin.html" style="background: rgba(212, 175, 55, 0.2); color: #f3e5ab; border: 1px solid rgba(212, 175, 55, 0.4); padding: 0.35rem 0.8rem; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem;">🍶 酒蔵管理画面</a>';
+    } else if (u.role === 'brewery_admin') {
+        navHtml = '<a href="/brewery_admin.html" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); padding: 0.35rem 0.8rem; border-radius: 6px; text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem;">🍶 酒蔵管理者ポータル</a>';
+    }
+    navContainer.innerHTML = navHtml;
+}
+document.addEventListener('DOMContentLoaded', updateNavLinksForRole);
+</script>
+
+</body>
+</html>
