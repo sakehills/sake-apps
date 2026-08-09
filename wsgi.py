@@ -19,6 +19,11 @@ def application(environ, start_response):
     PythonAnywhere などの WSGI サーバー環境で server.py の SakeApiServer を動作させるための WSGI ラッパー
     """
     path = environ.get('PATH_INFO', '')
+    try:
+        path = path.encode('iso-8859-1').decode('utf-8')
+    except Exception:
+        pass
+
     query = environ.get('QUERY_STRING', '')
     if query:
         path += '?' + query

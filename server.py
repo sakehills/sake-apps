@@ -4,6 +4,11 @@ def clean_img_url(p):
     idx = p_str.find('cropped_images')
     if idx != -1:
         return '/' + p_str[idx:]
+    idx_up = p_str.find('uploaded_images')
+    if idx_up != -1:
+        return '/' + p_str[idx_up:]
+    if not p_str.startswith('/') and not p_str.startswith('http://') and not p_str.startswith('https://') and not p_str.startswith('data:'):
+        return '/' + p_str
     return p_str
 
 # In-Memory Cache Globals
@@ -331,12 +336,23 @@ class SakeApiServer(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         if not hasattr(self, 'directory'):
             self.directory = BASE_DIR
-        # クエリ文字列(?...)やアンカー(#...)を分離して純粋なパスを取得
+        # WSGI PEP 3333 latin-1 エンコーディングフォールバック
+        try:
+            path = path.encode('iso-8859-1').decode('utf-8')
+        except Exception:
+            pass
+
+        # クエリ文字列(?...)やアンカー(#...)を分離
         clean_path = path.split('?')[0].split('#')[0]
+        try:
+            clean_path = urllib.parse.unquote(clean_path)
+        except Exception:
+            pass
+
         if clean_path.endswith('/') and len(clean_path) > 1:
             clean_path = clean_path[:-1]
 
-        # viewer.htmlをルートとしてサービングするためのパス翻訳
+        # ルートおよびHTMLページのエイリアス翻訳
         if clean_path in ("/", ""):
             return os.path.join(BASE_DIR, "app", "viewer.html")
         elif clean_path in ("/admin", "/admin.html", "/app/admin.html"):
@@ -347,7 +363,10 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             return os.path.join(BASE_DIR, "app", "brewery_admin.html")
         elif clean_path in ("/mobile", "/mobile.html", "/mobile_viewer.html", "/mobile_viewer", "/app/mobile_viewer.html"):
             return os.path.join(BASE_DIR, "app", "mobile_viewer.html")
-        return super().translate_path(clean_path)
+
+        # 画像やCSS, JSなどの静的ファイルのパス解決
+        rel_path = clean_path.lstrip('/')
+        return os.path.join(BASE_DIR, rel_path)
     def do_GET(self):
         if self.path.startswith("/api/image/proxy"):
             import urllib.parse
