@@ -329,18 +329,23 @@ def generate_ai_comment_for_product(conn, product_id, user_name, image_path, ima
 
 class SakeApiServer(SimpleHTTPRequestHandler):
     def translate_path(self, path):
+        # クエリ文字列(?...)やアンカー(#...)を分離して純粋なパスを取得
+        clean_path = path.split('?')[0].split('#')[0]
+        if clean_path.endswith('/') and len(clean_path) > 1:
+            clean_path = clean_path[:-1]
+
         # viewer.htmlをルートとしてサービングするためのパス翻訳
-        if path == "/" or path == "":
+        if clean_path in ("/", ""):
             return os.path.join(BASE_DIR, "app", "viewer.html")
-        elif path == "/admin" or path == "/admin.html":
+        elif clean_path in ("/admin", "/admin.html", "/app/admin.html"):
             return os.path.join(BASE_DIR, "app", "admin.html")
-        elif path == "/map" or path == "/map.html":
+        elif clean_path in ("/map", "/map.html", "/app/map.html"):
             return os.path.join(BASE_DIR, "app", "map.html")
-        elif path == "/brewery_admin" or path == "/brewery_admin.html":
+        elif clean_path in ("/brewery_admin", "/brewery_admin.html", "/app/brewery_admin.html"):
             return os.path.join(BASE_DIR, "app", "brewery_admin.html")
-        elif path == "/mobile" or path == "/mobile.html" or path == "/mobile_viewer.html" or path == "/mobile_viewer":
+        elif clean_path in ("/mobile", "/mobile.html", "/mobile_viewer.html", "/mobile_viewer", "/app/mobile_viewer.html"):
             return os.path.join(BASE_DIR, "app", "mobile_viewer.html")
-        return super().translate_path(path)
+        return super().translate_path(clean_path)
     def do_GET(self):
         if self.path.startswith("/api/image/proxy"):
             import urllib.parse
