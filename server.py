@@ -925,7 +925,45 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     conn.close()
             return
         else:
-            super().do_GET()
+            filepath = self.translate_path(self.path)
+            if os.path.exists(filepath) and os.path.isfile(filepath):
+                try:
+                    with open(filepath, 'rb') as f:
+                        content = f.read()
+                    
+                    ext = os.path.splitext(filepath)[1].lower()
+                    content_types = {
+                        '.html': 'text/html; charset=utf-8',
+                        '.css': 'text/css; charset=utf-8',
+                        '.js': 'application/javascript; charset=utf-8',
+                        '.json': 'application/json; charset=utf-8',
+                        '.png': 'image/png',
+                        '.jpg': 'image/jpeg',
+                        '.jpeg': 'image/jpeg',
+                        '.gif': 'image/gif',
+                        '.svg': 'image/svg+xml',
+                        '.webp': 'image/webp',
+                        '.ico': 'image/x-icon'
+                    }
+                    ctype = content_types.get(ext, 'application/octet-stream')
+                    
+                    self.send_response(200)
+                    self.send_header('Content-Type', ctype)
+                    self.send_header('Content-Length', str(len(content)))
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(content)
+                    return
+                except Exception as e:
+                    print(f"ファイルレスポンスエラー ({filepath}): {e}")
+                    self.send_response(500)
+                    self.end_headers()
+                    return
+            
+            self.send_response(404)
+            self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.end_headers()
+            self.wfile.write("<h1>404 Not Found</h1>".encode('utf-8'))
 
     def do_POST(self):
         if self.path == "/api/login":
