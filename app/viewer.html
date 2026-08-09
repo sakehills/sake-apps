@@ -782,7 +782,63 @@
             transform: scale(1.02);
         }
 
-        /* フォーム共通 */
+        
+        .collection-tab {
+            background: rgba(20, 29, 47, 0.75);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 0.55rem 1.1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(8px);
+        }
+        .collection-tab:hover {
+            border-color: var(--accent);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+        .collection-tab.active {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.25), rgba(212, 175, 55, 0.05));
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+        }
+
+
+        /* 検索中ローディングオーバースピナー */
+        #loadingOverlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(11, 15, 25, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            min-height: 250px;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 5px solid rgba(212, 175, 55, 0.2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+/* フォーム共通 */
         .form-group {
             margin-bottom: 1.2rem;
         }
@@ -1216,6 +1272,9 @@ document.addEventListener('DOMContentLoaded', initAuth);
             <div class="subtitle" style="margin-top: 0.2rem;">日本酒画像の自動切り抜き・銘柄データViewer & 人間評価コレクター</div>
         </div>
         <div style="display: flex; gap: 1rem; align-items: center;">
+            <a href="/map.html" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25); transition: all 0.2s ease; font-size: 0.85rem;">
+                🗺️ 全国酒蔵マップ
+            </a>
             <a href="/admin.html" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 700; text-decoration: none; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25); transition: all 0.2s ease; font-size: 0.85rem;">
                 ⚙️ 管理者画面
             </a>
@@ -1224,6 +1283,18 @@ document.addEventListener('DOMContentLoaded', initAuth);
             </button>
         </div>
     </header>
+
+        <!-- ワンタップ コレクションフィルター -->
+        <div class="collection-tabs-container" style="display: flex; gap: 0.6rem; overflow-x: auto; padding: 0.25rem 0 1rem 0; margin-top: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <button class="collection-tab active" onclick="setCollectionFilter('', this)">🌐 すべて表示</button>
+            <button class="collection-tab" onclick="setCollectionFilter('gold_award', this)">🏆 全国新酒鑑評会 金賞酒</button>
+            <button class="collection-tab" onclick="setCollectionFilter('kura_master', this)">🥇 Kura Master 受賞酒</button>
+            <button class="collection-tab" onclick="setCollectionFilter('sparkling', this)">🥂 スパークリング日本酒</button>
+            <button class="collection-tab" onclick="setCollectionFilter('shochu_craft', this)">🥃 焼酎・クラフトサケ</button>
+            <button class="collection-tab" onclick="setCollectionFilter('kunshu', this)">🌸 フルーティー薫酒</button>
+            <button class="collection-tab" onclick="setCollectionFilter('junmai', this)">🌾 旨口・純米酒</button>
+        </div>
+
 
     <div class="controls-container">
         <div class="search-box">
@@ -1276,11 +1347,11 @@ document.addEventListener('DOMContentLoaded', initAuth);
 
     <!-- ページネーションコントロール -->
     <div class="pagination-container">
-        <button class="page-btn" id="btnFirst">⏮ 最初</button>
-        <button class="page-btn" id="btnPrev">◀ 前へ</button>
+        <button class="page-btn" id="btnFirst" >⏮ 最初</button>
+        <button class="page-btn" id="btnPrev" >◀ 前へ</button>
         <span class="page-info" id="pageInfo">1 / 1 ページ (合計 0件)</span>
-        <button class="page-btn" id="btnNext">次へ ▶</button>
-        <button class="page-btn" id="btnLast">最後 ⏭</button>
+        <button class="page-btn" id="btnNext" >次へ ▶</button>
+        <button class="page-btn" id="btnLast" >最後 ⏭</button>
     </div>
 
     <!-- ① 基本情報詳細モーダル -->
@@ -1764,8 +1835,6 @@ document.addEventListener('DOMContentLoaded', initAuth);
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            let sakeData = [];
-            const grid = document.getElementById('sakeGrid');
             const searchInput = document.getElementById('searchInput');
             const breweryFilter = document.getElementById('breweryFilter');
             const typeFilter = document.getElementById('typeFilter');
@@ -1773,1325 +1842,296 @@ document.addEventListener('DOMContentLoaded', initAuth);
             const imageFilter = document.getElementById('imageFilter');
             const sortOrder = document.getElementById('sortOrder');
             
-            // ① 詳細
-            const detailModal = document.getElementById('detailModal');
-            const detailImg = document.getElementById('detailImg');
-            const detailImgLabel = document.getElementById('detailImgLabel');
-            const detailImgToggle = document.getElementById('detailImgToggle');
-            const openSpecsEditBtn = document.getElementById('openSpecsEditBtn');
-            const mapPinAvg = document.getElementById('mapPinAvg');
-            const mapUserDots = document.getElementById('mapUserDots');
+            if (searchInput) searchInput.addEventListener('input', filterData);
+            if (breweryFilter) breweryFilter.addEventListener('change', filterData);
+            if (typeFilter) typeFilter.addEventListener('change', filterData);
+            if (ssiFilter) ssiFilter.addEventListener('change', filterData);
+            if (imageFilter) imageFilter.addEventListener('change', filterData);
+            if (sortOrder) sortOrder.addEventListener('change', filterData);
             
-            // ② 編集
-            const editModal = document.getElementById('editModal');
-            const editTitle = document.getElementById('editTitle');
-            const editForm = document.getElementById('editForm');
-            const editProductId = document.getElementById('editProductId');
-            const editBodyLevel = document.getElementById('editBodyLevel');
-            const editAromaLevel = document.getElementById('editAromaLevel');
-            const editComment = document.getElementById('editComment');
-            const editSsiGroup = document.getElementById('editSsiGroup');
-            const editImageInput = document.getElementById('editImageInput');
-            const editImagePreviewContainer = document.getElementById('editImagePreviewContainer');
-            const editImagePreviewImg = document.getElementById('editImagePreviewImg');
-            const editImageClearBtn = document.getElementById('editImageClearBtn');
-            const editSubmitBtn = document.getElementById('editSubmitBtn');
-            const editDeleteBtn = document.getElementById('editDeleteBtn');
-            const editTotalScore = document.getElementById('editTotalScore');
-            const editTasteScore = document.getElementById('editTasteScore');
-            const editAromaScore = document.getElementById('editAromaScore');
-             
-            // スライダー用追加要素
-            const valTotalScore = document.getElementById('valTotalScore');
-            const valTasteScore = document.getElementById('valTasteScore');
-            const valAromaScore = document.getElementById('valAromaScore');
-            const noTasteScore = document.getElementById('noTasteScore');
-            const noAromaScore = document.getElementById('noAromaScore');
-             
-            // スライダー値連動と無効化制御
-            setTimeout(() => {
-                 editTotalScore.addEventListener('input', function() {
-                     valTotalScore.textContent = parseFloat(this.value).toFixed(1);
-                 });
-                 editTasteScore.addEventListener('input', function() {
-                     valTasteScore.textContent = parseFloat(this.value).toFixed(1);
-                 });
-                 editAromaScore.addEventListener('input', function() {
-                     valAromaScore.textContent = parseFloat(this.value).toFixed(1);
-                 });
-                 
-                 noTasteScore.addEventListener('change', function() {
-                     editTasteScore.disabled = this.checked;
-                     if (this.checked) {
-                         editTasteScore.style.opacity = 0.4;
-                         valTasteScore.style.opacity = 0.4;
-                         valTasteScore.textContent = "--";
-                     } else {
-                         editTasteScore.style.opacity = 1;
-                         valTasteScore.style.opacity = 1;
-                         valTasteScore.textContent = parseFloat(editTasteScore.value).toFixed(1);
-                     }
-                 });
-                 noAromaScore.addEventListener('change', function() {
-                     editAromaScore.disabled = this.checked;
-                     if (this.checked) {
-                         editAromaScore.style.opacity = 0.4;
-                         valAromaScore.style.opacity = 0.4;
-                         valAromaScore.textContent = "--";
-                     } else {
-                         editAromaScore.style.opacity = 1;
-                         valAromaScore.style.opacity = 1;
-                         valAromaScore.textContent = parseFloat(editAromaScore.value).toFixed(1);
-                     }
-                 });
-             }, 0);
-            
-            // ③ 他者レビュー
-            const othersModal = document.getElementById('othersModal');
-            const othersTitle = document.getElementById('othersTitle');
-            const othersTimeline = document.getElementById('othersTimeline');
-
-            // ④ スペック手動編集
-            const specsEditModal = document.getElementById('specsEditModal');
-            const specsEditForm = document.getElementById('specsEditForm');
-            const specsEditId = document.getElementById('specsEditId');
-            
-            function getSakePlaceholder(sake_type) {
-                if (sake_type && sake_type.includes('大吟醸')) return 'cropped_images/placeholder_daiginjo.jpg';
-                if (sake_type && (sake_type.includes('リキュール') || sake_type.includes('果汁'))) return 'cropped_images/placeholder_liqueur.jpg';
-                if (sake_type && (sake_type.includes('にごり') || sake_type.includes('濁り'))) return 'cropped_images/placeholder_nigori.jpg';
-                return 'cropped_images/placeholder_noimage.jpg';
-            }
-
-            // 星評価表示用の汎用ヘルパー関数
-            function getStarHtml(score) {
-                if (score === undefined || score === null) return '';
-                let stars = '';
-                const rounded = Math.round(score);
-                for (let i = 1; i <= 5; i++) {
-                    if (rounded >= i) {
-                        stars += '★';
-                    } else {
-                        stars += '☆';
-                    }
-                }
-                return `<span style="color: var(--accent); font-weight: 700; margin-right: 0.5rem; letter-spacing: 1px;">${stars} ${score.toFixed(1)}</span>`;
-            }
-
-            const specsEditCategory = document.getElementById('specsEditCategory');
-            const specsEditAlcohol = document.getElementById('specsEditAlcohol');
-            const specsEditPolish = document.getElementById('specsEditPolish');
-            const specsEditIngredients = document.getElementById('specsEditIngredients');
-            const specsEditVariety = document.getElementById('specsEditVariety');
-            const specsEditYeast = document.getElementById('specsEditYeast');
-            const specsEditSmv = document.getElementById('specsEditSmv');
-            const specsEditAcidity = document.getElementById('specsEditAcidity');
-            const specsEditAmino = document.getElementById('specsEditAmino');
-            const specsEditJanCode = document.getElementById('specsEditJanCode');
-            const specsEditHeatingType = document.getElementById('specsEditHeatingType');
-            const specsEditIsGenshu = document.getElementById('specsEditIsGenshu');
-            const specsEditBrewingMethod = document.getElementById('specsEditBrewingMethod');
-            const specsEditServingTemp = document.getElementById('specsEditServingTemp');
-            const specsFrontImageInput = document.getElementById('specsFrontImageInput');
-            const specsFrontPreviewContainer = document.getElementById('specsFrontPreviewContainer');
-            const specsFrontPreviewImg = document.getElementById('specsFrontPreviewImg');
-            const specsFrontClearBtn = document.getElementById('specsFrontClearBtn');
-            const specsBackImageInput = document.getElementById('specsBackImageInput');
-            const specsBackPreviewContainer = document.getElementById('specsBackPreviewContainer');
-            const specsBackPreviewImg = document.getElementById('specsBackPreviewImg');
-            const specsBackClearBtn = document.getElementById('specsBackClearBtn');
-            const aiSuggestBtn = document.getElementById('aiSuggestBtn');
-            const aiSuggestLoading = document.getElementById('aiSuggestLoading');
-            
-            // ページネーション用の状態変数
-            let currentPage = 1;
-            const itemsPerPage = 50;
-            let filteredData = [];
-
             const btnFirst = document.getElementById('btnFirst');
             const btnPrev = document.getElementById('btnPrev');
             const btnNext = document.getElementById('btnNext');
             const btnLast = document.getElementById('btnLast');
-            const pageInfo = document.getElementById('pageInfo');
-
-            let currentSake = null;
-            let showFrontImage = true;
-            let selectedSsiType = "";
-            let attachedImageBase64_1 = "";
-            let attachedImageBase64_2 = "";
-
-            // スペック編集用の画像Base64状態
-            let specsFrontImageBase64 = null;
-            let specsBackImageBase64 = null;
-
-            // 初期化
-            async function init() {
-                try {
-                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 4rem 0;">データベースから日本酒情報を読み込み中...</div>';
-                    const response = await fetch('/api/products');
-                    if (!response.ok) throw new Error('API取得に失敗しました');
-                    sakeData = await response.json();
-                } catch(err) {
-                    grid.innerHTML = `<div class="no-data" style="grid-column: 1/-1; text-align: center; color: var(--danger); padding: 4rem 0;">お酒データの取得に失敗しました: ${err.message}</div>`;
-                    return;
-                }
-                
-                setupFilters();
-                
-                // イベントリスナー
-                searchInput.addEventListener('input', filterData);
-                breweryFilter.addEventListener('change', filterData);
-                typeFilter.addEventListener('change', filterData);
-                ssiFilter.addEventListener('change', filterData);
-                imageFilter.addEventListener('change', filterData);
-                sortOrder.addEventListener('change', filterData);
-                
-                detailImgToggle.addEventListener('click', toggleDetailImage);
-                
-                // スペック編集モーダルを開く
-                openSpecsEditBtn.addEventListener('click', openSpecsEditModal);
-                
-                // ページネーションボタン
-                btnFirst.addEventListener('click', () => { currentPage = 1; renderPage(); });
-                btnPrev.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); } });
-                btnNext.addEventListener('click', () => { 
-                    const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
-                    if (currentPage < totalPages) { currentPage++; renderPage(); } 
-                });
-                btnLast.addEventListener('click', () => { 
-                    const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
-                    currentPage = totalPages; 
-                    renderPage(); 
-                });
-                
-                // 画像アップロード時の読み込み処理 (口コミ用 2枚対応)
-                const editImageInput1 = document.getElementById('editImageInput1');
-                const editImagePreviewContainer1 = document.getElementById('editImagePreviewContainer1');
-                const editImagePreviewImg1 = document.getElementById('editImagePreviewImg1');
-                const editImageClearBtn1 = document.getElementById('editImageClearBtn1');
-
-                const editImageInput2 = document.getElementById('editImageInput2');
-                const editImagePreviewContainer2 = document.getElementById('editImagePreviewContainer2');
-                const editImagePreviewImg2 = document.getElementById('editImagePreviewImg2');
-                const editImageClearBtn2 = document.getElementById('editImageClearBtn2');
-
-                if (editImageInput1) {
-                    editImageInput1.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = function(event) {
-                            attachedImageBase64_1 = event.target.result;
-                            editImagePreviewImg1.src = attachedImageBase64_1;
-                            editImagePreviewContainer1.style.display = 'block';
-                        };
-                        reader.readAsDataURL(file);
-                    });
-                    editImageClearBtn1.addEventListener('click', () => {
-                        attachedImageBase64_1 = "";
-                        editImageInput1.value = "";
-                        editImagePreviewContainer1.style.display = 'none';
-                        editImagePreviewImg1.src = "";
-                    });
-                }
-
-                if (editImageInput2) {
-                    editImageInput2.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = function(event) {
-                            attachedImageBase64_2 = event.target.result;
-                            editImagePreviewImg2.src = attachedImageBase64_2;
-                            editImagePreviewContainer2.style.display = 'block';
-                        };
-                        reader.readAsDataURL(file);
-                    });
-                    editImageClearBtn2.addEventListener('click', () => {
-                        attachedImageBase64_2 = "";
-                        editImageInput2.value = "";
-                        editImagePreviewContainer2.style.display = 'none';
-                        editImagePreviewImg2.src = "";
-                    });
-                }
-
-                // スペック手動編集時の画像アップロード処理
-                specsFrontImageInput.addEventListener('change', (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        specsFrontImageBase64 = event.target.result;
-                        specsFrontPreviewImg.src = specsFrontImageBase64;
-                        specsFrontPreviewContainer.style.display = 'block';
-                    };
-                    reader.readAsDataURL(file);
-                });
-                specsFrontClearBtn.addEventListener('click', () => {
-                    specsFrontImageBase64 = ""; // 空文字でサーバーへ送信＝削除
-                    specsFrontImageInput.value = "";
-                    specsFrontPreviewContainer.style.display = 'none';
-                });
-
-                specsBackImageInput.addEventListener('change', (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        specsBackImageBase64 = event.target.result;
-                        specsBackPreviewImg.src = specsBackImageBase64;
-                        specsBackPreviewContainer.style.display = 'block';
-                    };
-                    reader.readAsDataURL(file);
-                });
-                specsBackClearBtn.addEventListener('click', () => {
-                    specsBackImageBase64 = ""; // 空文字でサーバーへ送信＝削除
-                    specsBackImageInput.value = "";
-                    specsBackPreviewContainer.style.display = 'none';
-                });
-                // AIスペック提案自動取得
-                aiSuggestBtn.addEventListener('click', async () => {
-                    const productId = parseInt(specsEditId.value);
-                    if (!productId) return;
-                    
-                    aiSuggestBtn.disabled = true;
-                    aiSuggestBtn.style.opacity = 0.5;
-                    aiSuggestLoading.style.display = 'inline-flex';
-                    
-                    try {
-                        const response = await fetch('/api/product/suggest', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ product_id: productId, jan_code: specsEditJanCode.value })
-                        });
-                        
-                        if (!response.ok) throw new Error('AI提案の取得に失敗しました');
-                        const result = await response.json();
-                        
-                        if (result.status === 'success' && result.data) {
-                            const spec = result.data;
-                            
-                            // フォームに反映
-                            if (spec.category) specsEditCategory.value = spec.category;
-                            if (spec.alcohol) specsEditAlcohol.value = spec.alcohol;
-                            if (spec.polish_ratio) specsEditPolish.value = spec.polish_ratio;
-                            if (spec.ingredients) specsEditIngredients.value = spec.ingredients;
-                            if (spec.rice_variety) specsEditVariety.value = spec.rice_variety;
-                            if (spec.yeast) specsEditYeast.value = spec.yeast;
-                            if (spec.smv) specsEditSmv.value = spec.smv;
-                            if (spec.acidity) specsEditAcidity.value = spec.acidity;
-                            if (spec.amino_acidity) specsEditAmino.value = spec.amino_acidity;
-                            if (spec.heating_type) specsEditHeatingType.value = spec.heating_type;
-                            if (spec.is_genshu !== undefined && spec.is_genshu !== null) specsEditIsGenshu.value = spec.is_genshu;
-                            if (spec.brewing_method) specsEditBrewingMethod.value = spec.brewing_method;
-                            if (spec.serving_temperature) specsEditServingTemp.value = spec.serving_temperature;
-                            
-                            alert('AIがWeb情報からスペック情報を自動抽出・入力しました！内容を確認し、問題なければ保存してください。');
-                        } else {
-                            throw new Error(result.message || 'データが空です');
-                        }
-                    } catch (err) {
-                        alert('AI自動入力中にエラーが発生しました: ' + err.message);
-                    } finally {
-                        aiSuggestBtn.disabled = false;
-                        aiSuggestBtn.style.opacity = 1;
-                        aiSuggestLoading.style.display = 'none';
-                    }
-                });
-                
-                // AIラベル画像スペック解析（OCR）
-                const aiOcrLabelBtn = document.getElementById('aiOcrLabelBtn');
-                const aiOcrLabelInput = document.getElementById('aiOcrLabelInput');
-                const aiLoadingText = document.getElementById('aiLoadingText');
-
-                aiOcrLabelBtn.addEventListener('click', () => {
-                    aiOcrLabelInput.click();
-                });
-
-                aiOcrLabelInput.addEventListener('change', async (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-
-                    aiOcrLabelBtn.disabled = true;
-                    aiOcrLabelBtn.style.opacity = 0.5;
-                    aiLoadingText.textContent = "AIがボトル裏ラベル画像をOCR解析中...";
-                    aiSuggestLoading.style.display = 'inline-flex';
-
-                    const reader = new FileReader();
-                    reader.onload = async function(event) {
-                        const base64Image = event.target.result;
-                        try {
-                            const response = await fetch('/api/product/analyze-label', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ image: base64Image })
-                            });
-
-                            if (!response.ok) throw new Error('ラベル解析に失敗しました');
-                            const result = await response.json();
-
-                            if (result.status === 'success' && result.data) {
-                                const spec = result.data;
-
-                                // フォームに反映
-                                if (spec.category) specsEditCategory.value = spec.category;
-                                if (spec.alcohol) specsEditAlcohol.value = spec.alcohol;
-                                if (spec.polish_ratio) specsEditPolish.value = spec.polish_ratio;
-                                if (spec.ingredients) specsEditIngredients.value = spec.ingredients;
-                                if (spec.rice_variety) specsEditVariety.value = spec.rice_variety;
-                                if (spec.yeast) specsEditYeast.value = spec.yeast;
-                                if (spec.smv) specsEditSmv.value = spec.smv;
-                                if (spec.acidity) specsEditAcidity.value = spec.acidity;
-                                if (spec.amino_acidity) specsEditAmino.value = spec.amino_acidity;
-                                if (spec.heating_type) specsEditHeatingType.value = spec.heating_type;
-                                if (spec.is_genshu !== undefined && spec.is_genshu !== null) specsEditIsGenshu.value = spec.is_genshu;
-                                if (spec.brewing_method) specsEditBrewingMethod.value = spec.brewing_method;
-                                if (spec.serving_temperature) specsEditServingTemp.value = spec.serving_temperature;
-
-                                alert('裏ラベル画像からスペック情報を100%正確に自動読み取り・入力しました！内容を確認し、保存してください。');
-                            } else {
-                                throw new Error(result.message || 'データが空です');
-                            }
-                        } catch (err) {
-                            alert('ラベル画像自動入力中にエラーが発生しました: ' + err.message);
-                        } finally {
-                            aiOcrLabelBtn.disabled = false;
-                            aiOcrLabelBtn.style.opacity = 1;
-                            aiSuggestLoading.style.display = 'none';
-                            aiOcrLabelInput.value = "";
-                        }
-                    };
-                    reader.readAsDataURL(file);
-                });
-
-                // CSVインポート処理 (管理者画面へ移動済み)
-                const csvImportBtn = document.getElementById('csvImportBtn');
-                const csvImportInput = document.getElementById('csvImportInput');
-                if (csvImportBtn && csvImportInput) {
-                    csvImportBtn.addEventListener('click', () => {
-                        csvImportInput.click();
-                    });
-
-                    csvImportInput.addEventListener('change', (e) => {
-                        const file = e.target.files[0];
-                        if (!file) return;
-
-                        const reader = new FileReader();
-                        reader.onload = async function(event) {
-                            const csvText = event.target.result;
-                            
-                            csvImportBtn.disabled = true;
-                            csvImportBtn.style.opacity = 0.5;
-                            csvImportBtn.textContent = '⏳ インポート中...';
-
-                            try {
-                                const response = await fetch('/api/product/import-csv', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ csv_text: csvText })
-                                });
-
-                                if (!response.ok) throw new Error('インポート通信に失敗しました');
-                                const result = await response.json();
-
-                                if (result.status === 'success') {
-                                    alert(result.message);
-                                    window.location.reload();
-                                } else {
-                                    throw new Error(result.message || '不明なエラー');
-                                }
-                            } catch (err) {
-                                alert('CSVインポート中にエラーが発生しました: ' + err.message);
-                            } finally {
-                                csvImportBtn.disabled = false;
-                                csvImportBtn.style.opacity = 1;
-                                csvImportBtn.textContent = '📥 スペックCSVインポート';
-                                csvImportInput.value = '';
-                            }
-                        };
-                        reader.readAsText(file, 'UTF-8');
-                    });
-                }
-                
-                // SSI 4タイプ選択
-                editSsiGroup.querySelectorAll('.ssi-btn').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        editSsiGroup.querySelectorAll('.ssi-btn').forEach(b => b.classList.remove('active'));
-                        if (selectedSsiType === btn.dataset.type) {
-                            selectedSsiType = "";
-                        } else {
-                            btn.classList.add('active');
-                            selectedSsiType = btn.dataset.type;
-                        }
-                    });
-                });
-                
-                // コメント送信
-                editForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    const payload = {
-                        product_id: parseInt(editProductId.value),
-                        user_name: getCurrentUserName(),
-                        ssi_type: selectedSsiType,
-                        body_level: editBodyLevel.value,
-                        aroma_level: editAromaLevel.value,
-                        comment: editComment.value,
-                        rating_image: attachedImageBase64_1,
-                        rating_image_2: attachedImageBase64_2,
-                        user_id: 'test_seed_secondary_sources',
-                        total_score: parseFloat(editTotalScore.value),
-                        taste_score: noTasteScore.checked ? null : parseFloat(editTasteScore.value),
-                        aroma_score: noAromaScore.checked ? null : parseFloat(editAromaScore.value)
-                    };
-                    
-                    try {
-                        const response = await fetch('/api/rate', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        
-                        if (response.ok) {
-                            alert('評価を保存しました。');
-                            window.location.reload();
-                        } else {
-                            alert('保存に失敗しました。');
-                        }
-                    } catch (err) {
-                        alert('通信エラーが発生しました。');
-                    }
-                });
-                
-                // コメント削除
-                editDeleteBtn.addEventListener('click', async () => {
-                    if (!confirm('本当にこのコメントを削除しますか？')) return;
-                    
-                    const payload = {
-                        product_id: parseInt(editProductId.value),
-                        user_name: getCurrentUserName()
-                    };
-                    
-                    try {
-                        const response = await fetch('/api/rate/delete', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        
-                        if (response.ok) {
-                            alert('削除しました。');
-                            window.location.reload();
-                        } else {
-                            alert('削除に失敗しました。');
-                        }
-                    } catch (err) {
-                        alert('削除通信エラーが発生しました。');
-                    }
-                });
-
-                // スペック手動編集送信
-                specsEditForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    const payload = {
-                        id: parseInt(specsEditId.value),
-                        category: specsEditCategory.value,
-                        alcohol: parseFloat(specsEditAlcohol.value) || null,
-                        polish_ratio: specsEditPolish.value,
-                        ingredients: specsEditIngredients.value,
-                        rice_variety: specsEditVariety.value,
-                        yeast: specsEditYeast.value,
-                        smv: specsEditSmv.value,
-                        acidity: specsEditAcidity.value,
-                        amino_acidity: specsEditAmino.value,
-                        jan_code: specsEditJanCode.value,
-                        heating_type: specsEditHeatingType.value,
-                        is_genshu: specsEditIsGenshu.value !== "" ? parseInt(specsEditIsGenshu.value) : null,
-                        brewing_method: specsEditBrewingMethod.value,
-                        serving_temperature: specsEditServingTemp.value,
-                        cropped_image_path_front: specsFrontImageBase64,
-                        cropped_image_path_back: specsBackImageBase64
-                    };
-                    
-                    try {
-                        const response = await fetch('/api/product/update', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        
-                        if (response.ok) {
-                            alert('スペック情報を保存しました。');
-                            window.location.reload();
-                        } else {
-                            alert('スペック情報の保存に失敗しました。');
-                        }
-                    } catch (err) {
-                        alert('スペック保存通信エラーが発生しました。');
-                    }
-                });
-
-                // 初期フィルタ＆レンダリング実行
-                filterData();
-            }
-
-            // 検索とフィルター、ソートの適用
-            function filterData() {
-                const query = searchInput.value.toLowerCase();
-                const selectedBrewery = breweryFilter.value;
-                const selectedType = typeFilter.value;
-                const selectedSsi = ssiFilter.value;
-                const imageState = imageFilter.value;
-                const sortType = sortOrder.value;
-                
-                filteredData = sakeData.filter(item => {
-                    const matchesSearch = 
-                        item.name.toLowerCase().includes(query) ||
-                        (item.sub_name && item.sub_name.toLowerCase().includes(query)) ||
-                        (item.brewery && item.brewery.toLowerCase().includes(query)) ||
-                        (item.sake_type && item.sake_type.toLowerCase().includes(query));
-                        
-                    const matchesBrewery = !selectedBrewery || item.brewery === selectedBrewery;
-                    const matchesType = !selectedType || item.sake_type === selectedType;
-                    
-                    const ssi = item.ssi_type || (item.ratings && item.ratings.length > 0 ? item.ratings[0].ssi_type : "");
-                    const matchesSsi = !selectedSsi || ssi === selectedSsi;
-                    
-                    const hasImage = !!(item.cropped_image_path_front);
-                    const matchesImage = !imageState || 
-                        (imageState === 'has_image' && hasImage) || 
-                        (imageState === 'no_image' && !hasImage);
-                        
-                    return matchesSearch && matchesBrewery && matchesType && matchesSsi && matchesImage;
-                });
-                
-                if (sortType === 'id_asc') {
-                    filteredData.sort((a, b) => a.id - b.id);
-                } else if (sortType === 'id_desc') {
-                    filteredData.sort((a, b) => b.id - a.id);
-                } else if (sortType === 'alcohol_desc') {
-                    filteredData.sort((a, b) => (b.alcohol_content || 0) - (a.alcohol_content || 0));
-                } else if (sortType === 'alcohol_asc') {
-                    filteredData.sort((a, b) => (a.alcohol_content || 0) - (b.alcohol_content || 0));
-                } else if (sortType === 'reviews_desc') {
-                    filteredData.sort((a, b) => {
-                        const lenA = a.ratings ? a.ratings.length : 0;
-                        const lenB = b.ratings ? b.ratings.length : 0;
-                        return lenB - lenA;
-                    });
-                } else if (sortType === 'name_asc') {
-                    filteredData.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-                }
-                
-                currentPage = 1;
-                renderPage();
-            }
-
-            // ページごとのスライスレンダリング (DOM描画の最適化)
-            function renderPage() {
-                grid.innerHTML = '';
-                const totalItems = filteredData.length;
-                const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-                
-                if (currentPage > totalPages) currentPage = totalPages;
-                if (currentPage < 1) currentPage = 1;
-                
-                const startIdx = (currentPage - 1) * itemsPerPage;
-                const endIdx = Math.min(startIdx + itemsPerPage, totalItems);
-                
-                const pageSlice = filteredData.slice(startIdx, endIdx);
-                
-                btnFirst.disabled = (currentPage === 1);
-                btnPrev.disabled = (currentPage === 1);
-                btnNext.disabled = (currentPage === totalPages);
-                btnLast.disabled = (currentPage === totalPages);
-                
-                pageInfo.textContent = `${currentPage} / ${totalPages} ページ (合計 ${totalItems}件)`;
-                
-                if (pageSlice.length === 0) {
-                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 4rem 0;">該当する日本酒がありません。</div>';
-                    return;
-                }
-                
-                pageSlice.forEach(item => {
-                    const card = document.createElement('div');
-                    card.className = 'sake-card';
-                    
-                    const othersCount = item.ratings ? item.ratings.filter(r => r.user_name !== getCurrentUserName()).length : 0;
-                    const hasMyComment = item.ratings ? item.ratings.some(r => r.user_name === getCurrentUserName()) : false;
-                    const editBtnText = hasMyComment ? '✍️ コメントの修正' : '➕ コメントを追加';
-                    
-                    let indicatorHtml = '';
-                    if (othersCount > 0) {
-                        indicatorHtml = `<div class="comment-badge">💬 他のレビュー (${othersCount}件)</div>`;
-                    }
-                    
-                    // 平均評点の算出
-                    const ratings = item.ratings || [];
-                    const totalScores = ratings.map(r => r.total_score).filter(s => s !== undefined && s !== null);
-                    let ratingBadgeHtml = '';
-                    if (totalScores.length > 0) {
-                        const avg = (totalScores.reduce((a,b)=>a+b, 0) / totalScores.length).toFixed(1);
-                        ratingBadgeHtml = `<div class="card-rating-badge">★ ${avg} (${totalScores.length})</div>`;
-                    }
-                    
-                    // マイ評価の算出
-                    const myRating = ratings.find(r => r.user_name === getCurrentUserName());
-                    let myRatingBadgeHtml = '';
-                    if (myRating && myRating.total_score !== undefined && myRating.total_score !== null) {
-                        myRatingBadgeHtml = `<div class="card-my-rating-badge">あなた: ★ ${myRating.total_score.toFixed(1)}</div>`;
-                    }
-                    
-                    const isUserUploaded = item.cropped_image_path_front && item.cropped_image_path_front.includes('uploaded_images/');
-                    const isAiImage = item.cropped_image_path_front && (
-                        item.cropped_image_path_front.includes('aramasa_') || 
-                        item.cropped_image_path_front.includes('ai_') || 
-                        item.cropped_image_path_front.includes('proxy?url=')
-                    );
-                    
-                    let imageBadgeHtml = '';
-                    if (isUserUploaded) {
-                        imageBadgeHtml = `<div class="card-my-rating-badge" style="background: rgba(59, 130, 246, 0.85); border-color: rgba(59, 130, 246, 0.4); top: auto; bottom: 10px; left: 10px; font-size: 0.65rem;">📸 実写写真</div>`;
-                    } else if (isAiImage) {
-                        imageBadgeHtml = `<div class="card-ai-image-badge">AIイメージ</div>`;
-                    } else if (!item.cropped_image_path_front) {
-                        imageBadgeHtml = `<div class="card-ai-image-badge" style="background: rgba(239, 68, 68, 0.85); border: 1px solid rgba(239, 68, 68, 0.4); color: white;">🚫 画像未登録</div>`;
-                    }
-
-                    card.innerHTML = `
-                        <div class="sake-id">ID: ${String(item.id).padStart(4, '0')}</div>
-                        <div class="image-container">
-                            ${myRatingBadgeHtml}
-                            ${ratingBadgeHtml}
-                            ${imageBadgeHtml}
-                            <img src="${item.cropped_image_path_front || getSakePlaceholder(item.sake_type)}" alt="${item.name}">
-                        </div>
-                        <div class="sake-info">
-                            <div class="sake-brewery">${item.brewery || '不明'}</div>
-                            <div class="sake-name">${item.name}</div>
-                            <div style="margin-bottom: 0.5rem; height: 1.5rem;">${indicatorHtml}</div>
-                            <div class="tag-container">
-                                <span class="tag">${item.alcohol_content ? item.alcohol_content + '度' : '度数不明'}</span>
-                                <span class="tag tag-type">${item.sake_type || '特定名称不明'}</span>
-                            </div>
-                            ${renderAwardBadgesHtml(item.awards)}
-                        </div>
-                        <div class="card-actions">
-                            <button class="action-btn btn-edit" onclick="event.stopPropagation(); openEditModal(${item.id})">${editBtnText}</button>
-                            <button class="action-btn btn-others" onclick="event.stopPropagation(); openOthersModal(${item.id})">🔍 他のコメント</button>
-                        </div>
-                    `;
-                    
-                    card.addEventListener('click', () => showDetailModal(item));
-                    grid.appendChild(card);
-                });
-            }
-
-            // A. 詳細スペック表示 (すべてのカラム値を表示)
-            function showDetailModal(item) {
-                currentSake = item;
-                showFrontImage = true;
-                
-                const awardsContainer = document.getElementById('detailAwardsContainer');
-                if (awardsContainer) {
-                    awardsContainer.innerHTML = renderAwardBadgesHtml(item.awards);
-                }
-                
-                detailImg.src = item.cropped_image_path_front || getSakePlaceholder(item.sake_type);
-                detailImgLabel.textContent = '表面';
-                updateDetailAiBadge(item.cropped_image_path_front);
-                
-                if (item.cropped_image_path_back) {
-                    detailImgToggle.style.display = 'block';
-                    detailImgToggle.textContent = '裏面画像を表示';
-                } else {
-                    detailImgToggle.style.display = 'none';
-                }
-                
-                document.getElementById('detailName').textContent = item.name;
-                document.getElementById('detailSubName').textContent = item.sub_name || '';
-                document.getElementById('detBrewery').textContent = item.brewery || '-';
-                document.getElementById('detType').textContent = item.sake_type || '-';
-                document.getElementById('detAlcohol').textContent = item.alcohol_content ? `${item.alcohol_content}度` : '-';
-                document.getElementById('detPolishing').textContent = item.polishing_rate || '-';
-                document.getElementById('detMaterials').textContent = item.raw_materials || '-';
-                document.getElementById('detVariety').textContent = item.rice_variety || '非公開';
-                document.getElementById('detYeast').textContent = item.yeast || '非公開';
-                document.getElementById('detSmv').textContent = item.smv || '非公開';
-                document.getElementById('detAcidity').textContent = item.acidity || '非公開';
-                document.getElementById('detAminoAcidity').textContent = item.amino_acidity || '非公開';
-                document.getElementById('detHeatingType').textContent = item.heating_type || '-';
-                document.getElementById('detIsGenshu').textContent = item.is_genshu === 1 ? '原酒 (加水なし)' : (item.is_genshu === 0 ? '加水調整あり' : '-');
-                document.getElementById('detBrewingMethod').textContent = item.brewing_method || '-';
-                document.getElementById('detServingTemp').textContent = item.serving_temperature || '-';
-                document.getElementById('detAddress').textContent = item.brewery_address || '-';
-                document.getElementById('detJanCode').textContent = item.jan_code || '-';
-                
-                document.getElementById('detComment').textContent = item.comment || '-';
-                
-                renderTasteMap(item);
-                
-                openModal('detailModal');
-            }
-
-            // 味わいマップの描画ロジック
-            function renderTasteMap(item) {
-                mapUserDots.innerHTML = '';
-                
-                const bodyVal = { "濃醇": 1.0, "中間": 0.0, "淡麗辛口": -1.0 };
-                const aromaVal = { "華やかフルーティ": 1.0, "しっかり個性的": 0.0, "すっきりおだやか": -1.0 };
-                
-                const ratings = item.ratings || [];
-                let totalX = 0;
-                let totalY = 0;
-                let validCount = 0;
-                
-                ratings.forEach(r => {
-                    const x = aromaVal[r.aroma_level];
-                    const y = bodyVal[r.body_level];
-                    
-                    if (x !== undefined && y !== undefined) {
-                        totalX += x;
-                        totalY += y;
-                        validCount++;
-                        
-                        const dot = document.createElement('div');
-                        dot.className = 'map-dot-user';
-                        
-                        const leftPercent = (x + 1) / 2 * 100;
-                        const bottomPercent = (y + 1) / 2 * 100;
-                        
-                        dot.style.left = `${leftPercent}%`;
-                        dot.style.bottom = `${bottomPercent}%`;
-                        dot.title = `${r.user_name}: ${r.aroma_level} / ${r.body_level}`;
-                        mapUserDots.appendChild(dot);
-                    }
-                });
-                
-                const defaultX = aromaVal[item.aroma_level];
-                const defaultY = bodyVal[item.body_level];
-                if (defaultX !== undefined && defaultY !== undefined) {
-                    totalX += defaultX;
-                    totalY += defaultY;
-                    validCount++;
-                }
-                
-                if (validCount > 0) {
-                    const avgX = totalX / validCount;
-                    const avgY = totalY / validCount;
-                    
-                    const leftPercent = (avgX + 1) / 2 * 100;
-                    const bottomPercent = (avgY + 1) / 2 * 100;
-                    
-                    mapPinAvg.style.left = `${leftPercent}%`;
-                    mapPinAvg.style.bottom = `${bottomPercent}%`;
-                    mapPinAvg.style.display = 'block';
-                    mapPinAvg.title = `ユーザー平均評価: (${avgX.toFixed(2)}, ${avgY.toFixed(2)})`;
-                } else {
-                    mapPinAvg.style.display = 'none';
-                }
-
-                // ② スペック算出ピン (国税庁式: 甘辛度・濃淡度)
-                const mapPinCalc = document.getElementById('mapPinCalc');
-                if (item.flavor_x !== null && item.flavor_y !== null && item.flavor_x !== undefined && item.flavor_y !== undefined) {
-                    const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
-                    // -2.5 ～ +2.5 の範囲を 0% ～ 100% にマッピング
-                    const leftPercent = clamp(((item.flavor_x - (-2.5)) / 5.0) * 100, 4, 96);
-                    const bottomPercent = clamp(((item.flavor_y - (-2.5)) / 5.0) * 100, 4, 96);
-                    
-                    mapPinCalc.style.left = `${leftPercent}%`;
-                    mapPinCalc.style.bottom = `${bottomPercent}%`;
-                    mapPinCalc.style.display = 'block';
-                    const xStr = item.flavor_x > 0 ? `+${item.flavor_x}` : `${item.flavor_x}`;
-                    const yStr = item.flavor_y > 0 ? `+${item.flavor_y}` : `${item.flavor_y}`;
-                    mapPinCalc.title = `スペック算出位置 (国税庁式): 甘辛度 ${xStr}, 濃淡度 ${yStr}`;
-                } else {
-                    mapPinCalc.style.display = 'none';
-                }
-            }
-
-            // B. コメント追加・修正モーダルを開く
-            window.openEditModal = function(productId) {
-                const item = sakeData.find(d => d.id === productId);
-                if (!item) return;
-                
-                editProductId.value = item.id;
-                attachedImageBase64_1 = "";
-                attachedImageBase64_2 = "";
-                
-                const imgInput1 = document.getElementById('editImageInput1');
-                const imgInput2 = document.getElementById('editImageInput2');
-                const imgPrevCont1 = document.getElementById('editImagePreviewContainer1');
-                const imgPrevCont2 = document.getElementById('editImagePreviewContainer2');
-                const imgPrevImg1 = document.getElementById('editImagePreviewImg1');
-                const imgPrevImg2 = document.getElementById('editImagePreviewImg2');
-
-                if (imgInput1) imgInput1.value = "";
-                if (imgInput2) imgInput2.value = "";
-                if (imgPrevCont1) imgPrevCont1.style.display = 'none';
-                if (imgPrevCont2) imgPrevCont2.style.display = 'none';
-                if (imgPrevImg1) imgPrevImg1.src = "";
-                if (imgPrevImg2) imgPrevImg2.src = "";
-                
-                const myRating = item.ratings ? item.ratings.find(r => r.user_name === getCurrentUserName()) : null;
-                
-                selectedSsiType = "";
-                editSsiGroup.querySelectorAll('.ssi-btn').forEach(btn => btn.classList.remove('active'));
-                
-                // 全員の平均評点と件数を計算
-                const ratings = item.ratings || [];
-                const totalScores = ratings.map(r => r.total_score).filter(s => s !== undefined && s !== null);
-                const tasteScores = ratings.map(r => r.taste_score).filter(s => s !== undefined && s !== null);
-                const aromaScores = ratings.map(r => r.aroma_score).filter(s => s !== undefined && s !== null);
-                
-                const avgTotal = totalScores.length > 0 ? (totalScores.reduce((a,b)=>a+b, 0) / totalScores.length).toFixed(1) : null;
-                const avgTaste = tasteScores.length > 0 ? (tasteScores.reduce((a,b)=>a+b, 0) / tasteScores.length).toFixed(1) : null;
-                const avgAroma = aromaScores.length > 0 ? (aromaScores.reduce((a,b)=>a+b, 0) / aromaScores.length).toFixed(1) : null;
-                
-                document.getElementById('avgTotalScore').textContent = avgTotal ? `全員の平均: ★${avgTotal} (${totalScores.length}件)` : '全員の平均: なし';
-                document.getElementById('avgTasteScore').textContent = avgTaste ? `全員の平均: ★${avgTaste} (${tasteScores.length}件)` : '全員の平均: なし';
-                document.getElementById('avgAromaScore').textContent = avgAroma ? `全員の平均: ★${avgAroma} (${aromaScores.length}件)` : '全員の平均: なし';
-
-                if (myRating) {
-                    editTitle.textContent = `コメントを修正・削除する - ${item.name}`;
-                    editBodyLevel.value = myRating.body_level || "";
-                    editAromaLevel.value = myRating.aroma_level || "";
-                    editComment.value = myRating.comment || "";
-                    editTotalScore.value = myRating.total_score !== undefined && myRating.total_score !== null ? myRating.total_score : "4.0";
-                    
-                    if (myRating.taste_score !== undefined && myRating.taste_score !== null) {
-                        editTasteScore.value = myRating.taste_score;
-                        noTasteScore.checked = false;
-                    } else {
-                        editTasteScore.value = avgTaste || "4.0";
-                        noTasteScore.checked = true;
-                    }
-                    
-                    if (myRating.aroma_score !== undefined && myRating.aroma_score !== null) {
-                        editAromaScore.value = myRating.aroma_score;
-                        noAromaScore.checked = false;
-                    } else {
-                        editAromaScore.value = avgAroma || "4.0";
-                        noAromaScore.checked = true;
-                    }
-                    
-                    if (myRating.ssi_type) {
-                        selectedSsiType = myRating.ssi_type;
-                        const targetBtn = editSsiGroup.querySelector(`[data-type="${myRating.ssi_type}"]`);
-                        if (targetBtn) targetBtn.classList.add('active');
-                    }
-                    
-                    if (myRating.rating_image) {
-                        attachedImageBase64_1 = myRating.rating_image;
-                        if (imgPrevImg1) imgPrevImg1.src = myRating.rating_image;
-                        if (imgPrevCont1) imgPrevCont1.style.display = 'block';
-                    }
-                    if (myRating.rating_image_2) {
-                        attachedImageBase64_2 = myRating.rating_image_2;
-                        if (imgPrevImg2) imgPrevImg2.src = myRating.rating_image_2;
-                        if (imgPrevCont2) imgPrevCont2.style.display = 'block';
-                    }
-                    
-                    editSubmitBtn.textContent = '更新する';
-                    editDeleteBtn.style.display = 'block';
-                } else {
-                    editTitle.textContent = `コメントを追加する - ${item.name}`;
-                    editBodyLevel.value = "";
-                    editAromaLevel.value = "";
-                    editComment.value = "";
-                    editTotalScore.value = avgTotal || "4.0";
-                    editTasteScore.value = avgTaste || "4.0";
-                    editAromaScore.value = avgAroma || "4.0";
-                    noTasteScore.checked = true;
-                    noAromaScore.checked = true;
-                    
-                    editSubmitBtn.textContent = '登録する';
-                    editDeleteBtn.style.display = 'none';
-                }
-                
-                // イベントを発火させてUI表示値を同期
-                noTasteScore.dispatchEvent(new Event('change'));
-                noAromaScore.dispatchEvent(new Event('change'));
-                editTotalScore.dispatchEvent(new Event('input'));
-                
-                openModal('editModal');
-            };
-
-            // D. スペック手動編集モーダルを開く
-            function openSpecsEditModal() {
-                if (!currentSake) return;
-                
-                specsEditId.value = currentSake.id;
-                specsEditCategory.value = currentSake.sake_type || "";
-                specsEditAlcohol.value = currentSake.alcohol_content || "";
-                specsEditPolish.value = currentSake.polishing_rate || "";
-                specsEditIngredients.value = currentSake.raw_materials || "";
-                specsEditVariety.value = currentSake.rice_variety || "";
-                specsEditYeast.value = currentSake.yeast || "";
-                specsEditSmv.value = currentSake.smv || "";
-                specsEditAcidity.value = currentSake.acidity || "";
-                specsEditAmino.value = currentSake.amino_acidity || "";
-                specsEditJanCode.value = currentSake.jan_code || "";
-                specsEditHeatingType.value = currentSake.heating_type || "";
-                specsEditIsGenshu.value = currentSake.is_genshu !== null && currentSake.is_genshu !== undefined ? String(currentSake.is_genshu) : "";
-                specsEditBrewingMethod.value = currentSake.brewing_method || "";
-                specsEditServingTemp.value = currentSake.serving_temperature || "";
-                
-                // 画像状態のリセット
-                specsFrontImageInput.value = "";
-                specsBackImageInput.value = "";
-                specsFrontImageBase64 = null;
-                specsBackImageBase64 = null;
-                
-                if (currentSake.cropped_image_path_front) {
-                    specsFrontPreviewImg.src = currentSake.cropped_image_path_front;
-                    specsFrontPreviewContainer.style.display = 'block';
-                } else {
-                    specsFrontPreviewContainer.style.display = 'none';
-                }
-                
-                if (currentSake.cropped_image_path_back) {
-                    specsBackPreviewImg.src = currentSake.cropped_image_path_back;
-                    specsBackPreviewContainer.style.display = 'block';
-                } else {
-                    specsBackPreviewContainer.style.display = 'none';
-                }
-                
-                hideModal('detailModal');
-                openModal('specsEditModal');
-            }
-
-            // C. 他者のコメント参照モーダルを開く
-            window.openOthersModal = function(productId) {
-                const item = sakeData.find(d => d.id === productId);
-                if (!item) return;
-                
-                othersTitle.textContent = `他のユーザーのレビュー - ${item.name}`;
-                othersTimeline.innerHTML = '';
-                
-                const othersRatings = item.ratings ? item.ratings.filter(r => r.user_name !== getCurrentUserName()) : [];
-                
-                if (othersRatings.length > 0) {
-                    othersRatings.forEach(r => {
-                        const dateStr = r.created_at ? r.created_at.split('T')[0] : '不明';
-                        
-                        let tagsHtml = '';
-                        if (r.ssi_type) tagsHtml += `<span class="comment-tag-small">${r.ssi_type}</span>`;
-                        if (r.body_level) tagsHtml += `<span class="comment-tag-small">${r.body_level}</span>`;
-                        if (r.aroma_level) tagsHtml += `<span class="comment-tag-small">${r.aroma_level}</span>`;
-                        
-                        // 個別評点があればタグで表示
-                        if (r.taste_score !== undefined && r.taste_score !== null) tagsHtml += `<span class="comment-tag-small" style="color: var(--success);">味: ★${r.taste_score.toFixed(1)}</span>`;
-                        if (r.aroma_score !== undefined && r.aroma_score !== null) tagsHtml += `<span class="comment-tag-small" style="color: var(--accent);">香: ★${r.aroma_score.toFixed(1)}</span>`;
-                        
-                        let imgHtml = '';
-                        if (r.rating_image) {
-                            imgHtml += `<img class="comment-photo" src="${r.rating_image}" onclick="window.open('${r.rating_image}')" alt="口コミ添付画像1" style="max-width: 140px; margin-right: 6px; border-radius: 6px;">`;
-                        }
-                        if (r.rating_image_2) {
-                            imgHtml += `<img class="comment-photo" src="${r.rating_image_2}" onclick="window.open('${r.rating_image_2}')" alt="口コミ添付画像2" style="max-width: 140px; border-radius: 6px;">`;
-                        }
-                        if (imgHtml) {
-                            imgHtml = `<br><div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;">${imgHtml}</div>`;
-                        }
-                        
-                        const starHtml = r.total_score !== undefined && r.total_score !== null ? getStarHtml(r.total_score) : '';
-                        
-                        const itemDiv = document.createElement('div');
-                        itemDiv.className = 'comment-item';
-                        itemDiv.innerHTML = `
-                            <div class="comment-header">
-                                <span class="comment-user">👤 ${r.user_name}</span>
-                                <span class="comment-date">${starHtml} ${dateStr}</span>
-                            </div>
-                            <div class="comment-tags">
-                                ${tagsHtml}
-                            </div>
-                            <div class="comment-body">
-                                ${r.comment}
-                                ${imgHtml}
-                            </div>
-                        `;
-                        othersTimeline.appendChild(itemDiv);
-                    });
-                } else {
-                    othersTimeline.innerHTML = '<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 2rem 0;">他の方のレビューコメントはまだありません。</div>';
-                }
-                
-                openModal('othersModal');
-            };
-
-            function updateDetailAiBadge(imagePath) {
-                const badge = document.getElementById('detailAiBadge');
-                if (!badge) return;
-                if (!imagePath) {
-                    badge.style.display = 'block';
-                    badge.style.background = 'rgba(239, 68, 68, 0.85)';
-                    badge.style.border = '1px solid rgba(239, 68, 68, 0.4)';
-                    badge.style.color = 'white';
-                    badge.textContent = '🚫 画像未登録';
-                } else if (imagePath.includes('uploaded_images/')) {
-                    badge.style.display = 'block';
-                    badge.style.background = 'rgba(59, 130, 246, 0.85)';
-                    badge.style.border = '1px solid rgba(59, 130, 246, 0.4)';
-                    badge.style.color = 'white';
-                    badge.textContent = '📸 実写写真';
-                } else {
-                    badge.style.display = 'block';
-                    badge.style.background = 'rgba(11, 15, 25, 0.75)';
-                    badge.style.border = '1px solid rgba(255, 255, 255, 0.15)';
-                    badge.style.color = 'rgba(255, 255, 255, 0.8)';
-                    badge.textContent = 'AIイメージ';
-                }
-            }
-
-            // 詳細モーダル画像切り替え
-            function toggleDetailImage() {
-                if (!currentSake) return;
-                showFrontImage = !showFrontImage;
-                if (showFrontImage) {
-                    detailImg.src = currentSake.cropped_image_path_front || getSakePlaceholder(currentSake.sake_type);
-                    detailImgLabel.textContent = '表面';
-                    detailImgToggle.textContent = '裏面画像を表示';
-                    updateDetailAiBadge(currentSake.cropped_image_path_front);
-                } else {
-                    detailImg.src = currentSake.cropped_image_path_back || getSakePlaceholder(currentSake.sake_type);
-                    detailImgLabel.textContent = '裏面';
-                    detailImgToggle.textContent = '表面画像を表示';
-                    updateDetailAiBadge(currentSake.cropped_image_path_back);
-                }
-            }
-
-            // フィルター酒蔵/特定名称設定
-            function setupFilters() {
-                const breweries = new Set();
-                const types = new Set();
-                sakeData.forEach(item => {
-                    if (item.brewery) breweries.add(item.brewery);
-                    if (item.sake_type) types.add(item.sake_type);
-                });
-                
-                const sortedBreweries = Array.from(breweries).sort((a, b) => a.localeCompare(b, 'ja'));
-                const sortedTypes = Array.from(types).sort((a, b) => a.localeCompare(b, 'ja'));
-
-                sortedBreweries.forEach(b => {
-                    const opt = document.createElement('option');
-                    opt.value = b; opt.textContent = b;
-                    breweryFilter.appendChild(opt);
-                });
-                sortedTypes.forEach(t => {
-                    const opt = document.createElement('option');
-                    opt.value = t; opt.textContent = t;
-                    typeFilter.appendChild(opt);
-                });
-            }
-
-            // モーダルユーティリティ
-            function openModal(id) {
-                const m = document.getElementById(id);
-                m.classList.add('active');
-                document.body.style.overflow = 'hidden';
-            }
-            window.hideModal = function(id) {
-                const m = document.getElementById(id);
-                m.classList.remove('active');
-                document.body.style.overflow = '';
-            };
-
-            // 酒蔵モーダルの処理
-            const openBreweryBtn = document.getElementById('openBreweryBtn');
-            if (openBreweryBtn) {
-                openBreweryBtn.addEventListener('click', () => {
-                    const breweryName = document.getElementById('detBrewery').textContent;
-                    if (!breweryName || breweryName === '-') return;
-                    
-                    openModal('breweryModal');
-                    document.getElementById('breweryNameTitle').textContent = breweryName;
-                    document.getElementById('breweryKana').textContent = '';
-                    document.getElementById('breweryContent').style.display = 'none';
-                    document.getElementById('breweryLoading').style.display = 'block';
-                    
-                    fetch(`/api/brewery?name=${encodeURIComponent(breweryName)}`)
-                        .then(res => res.json())
-                        .then(data => {
-                            document.getElementById('breweryLoading').style.display = 'none';
-                            if (data.error) {
-                                document.getElementById('breweryContent').style.display = 'block';
-                                document.getElementById('breweryDesc').innerHTML = '酒蔵の詳細情報が見つかりませんでした。';
-                                document.querySelector('.brewery-info-grid').style.display = 'none';
-                                document.getElementById('breweryWebsiteContainer').style.display = 'none';
-                            } else {
-                                document.getElementById('breweryContent').style.display = 'block';
-                                document.querySelector('.brewery-info-grid').style.display = 'grid';
-                                
-                                if (data.name_norm && data.name_norm !== data.name) {
-                                    document.getElementById('breweryKana').textContent = data.name_norm;
-                                }
-                                
-                                document.getElementById('breweryDesc').innerHTML = data.description ? data.description.replace(/\n/g, '<br>') : '概要情報がありません。';
-                                document.getElementById('breweryPrefecture').textContent = data.prefecture || '-';
-                                
-                                const fullAddr = [data.city, data.address].filter(Boolean).join(' ');
-                                document.getElementById('breweryAddress').textContent = fullAddr || '-';
-                                
-                                document.getElementById('breweryFounded').textContent = data.founded_year ? `${data.founded_year}年` : '-';
-                                document.getElementById('breweryCorpNo').textContent = data.corporate_no || '-';
-                                
-                                const siteBtnContainer = document.getElementById('breweryWebsiteContainer');
-                                const siteBtn = document.getElementById('breweryWebsiteBtn');
-                                if (data.website) {
-                                    siteBtnContainer.style.display = 'block';
-                                    siteBtn.href = data.website;
-                                } else {
-                                    siteBtnContainer.style.display = 'none';
-                                }
-                            }
-                        })
-                        .catch(err => {
-                            console.error('Brewery fetch error:', err);
-                            document.getElementById('breweryLoading').style.display = 'none';
-                            document.getElementById('breweryContent').style.display = 'block';
-                            document.getElementById('breweryDesc').innerHTML = '通信エラーが発生しました。';
-                        });
-                });
-            }
-
-            // 受賞バッジ用ヘルパー
-            function getAwardBadgeClass(prize) {
-                if (!prize) return 'award-badge-gold';
-                if (prize.includes('Trophy') || prize.includes('トロフィー')) return 'award-badge-trophy';
-                if (prize.includes('プラチナ') || prize.includes('Platinum')) return 'award-badge-platinum';
-                if (prize.includes('Gold') || prize.includes('金賞') || prize.includes('GOLD')) return 'award-badge-gold';
-                if (prize.includes('Silver') || prize.includes('SILVER') || prize.includes('銀賞')) return 'award-badge-silver';
-                return 'award-badge-gold';
-            }
-
-            window.renderAwardBadgesHtml = function(awards) {
-                if (!awards || awards.length === 0) return '';
-                return '<div class="award-badge-container">' + awards.map(a => {
-                    const cls = getAwardBadgeClass(a.prize);
-                    const icon = cls === 'award-badge-trophy' ? '🏆' : (cls === 'award-badge-platinum' ? '👑' : '🥇');
-                    const text = `${icon} ${a.competition_name} ${a.year} ${a.prize}`;
-                    return `<span class="award-badge ${cls}" onclick="event.stopPropagation(); openCompetitionModal(${a.competition_id})">${text}</span>`;
-                }).join('') + '</div>';
-            };
-
-            // コンテスト一覧モーダル
-            const competitionsBtn = document.getElementById('competitionsBtn');
-            if (competitionsBtn) {
-                competitionsBtn.addEventListener('click', () => openCompetitionsListModal());
-            }
-
-            window.openCompetitionsListModal = function() {
-                openModal('competitionsListModal');
-                const grid = document.getElementById('competitionsListGrid');
-                grid.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--accent);">読み込み中...</div>';
-                
-                fetch('/api/competitions')
-                    .then(res => res.json())
-                    .then(data => {
-                        grid.innerHTML = data.map(c => `
-                            <div class="competition-card" onclick="openCompetitionModal(${c.id})">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
-                                    <h3 style="font-size:1.2rem; color:var(--accent); margin:0;">🏆 ${c.name}</h3>
-                                    <span style="font-size:0.8rem; background:rgba(212,175,55,0.15); color:var(--accent); padding:0.2rem 0.5rem; border-radius:12px;">${c.country || 'Global'}</span>
-                                </div>
-                                <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:0.8rem;">
-                                    ${c.organizer ? '主催: ' + c.organizer : ''} ${c.edition_label ? '(' + c.edition_label + ')' : ''}
-                                </div>
-                                <div style="display:flex; gap:1rem; font-size:0.85rem;">
-                                    <div>出展数: <strong style="color:var(--text-main);">${c.entries_total || '-'}</strong></div>
-                                    <div>最高賞: <strong style="color:var(--accent);">${c.gold_count ? c.gold_count + '賞' : '金賞'}</strong></div>
-                                </div>
-                            </div>
-                        `).join('');
-                    })
-                    .catch(err => {
-                        grid.innerHTML = '<div style="color:red; text-align:center;">エラーが発生しました。</div>';
-                    });
-            };
-
-            window.openCompetitionModal = function(compId) {
-                hideModal('competitionsListModal');
-                openModal('competitionModal');
-                
-                const title = document.getElementById('compTitle');
-                const meta = document.getElementById('compMeta');
-                const loading = document.getElementById('compLoading');
-                const content = document.getElementById('compContent');
-                const stats = document.getElementById('compStats');
-                const awardsGrid = document.getElementById('compAwardsGrid');
-                const siteBtn = document.getElementById('compWebsiteBtn');
-                const siteContainer = document.getElementById('compWebsiteContainer');
-                
-                loading.style.display = 'block';
-                content.style.display = 'none';
-                
-                fetch(`/api/competition?id=${compId}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        loading.style.display = 'none';
-                        content.style.display = 'block';
-                        
-                        const comp = data.competition;
-                        const event = (data.events && data.events.length > 0) ? data.events[0] : {};
-                        
-                        title.textContent = `🏆 ${comp.name}`;
-                        meta.textContent = [comp.organizer, comp.country, event.edition_label, event.venue].filter(Boolean).join(' | ');
-                        
-                        stats.innerHTML = `
-                            <div><div style="font-size:0.75rem; color:var(--text-muted);">開催年</div><strong style="font-size:1.1rem; color:var(--text-main);">${event.year || '-'}年</strong></div>
-                            <div><div style="font-size:0.75rem; color:var(--text-muted);">総出展数</div><strong style="font-size:1.1rem; color:var(--text-main);">${event.entries_total || '-'} 点</strong></div>
-                            <div><div style="font-size:0.75rem; color:var(--text-muted);">審査員数</div><strong style="font-size:1.1rem; color:var(--text-main);">${event.judges_count || '-'} 名</strong></div>
-                            <div><div style="font-size:0.75rem; color:var(--text-muted);">最高・金賞数</div><strong style="font-size:1.1rem; color:var(--accent);">${event.gold_count || '-'} 賞</strong></div>
-                        `;
-                        
-                        const webUrl = event.website || comp.website;
-                        if (webUrl) {
-                            siteContainer.style.display = 'block';
-                            siteBtn.href = webUrl;
-                        } else {
-                            siteContainer.style.display = 'none';
-                        }
-                        
-                        if (data.awards && data.awards.length > 0) {
-                            awardsGrid.innerHTML = data.awards.map(a => {
-                                const cls = getAwardBadgeClass(a.prize);
-                                const icon = cls === 'award-badge-trophy' ? '🏆' : (cls === 'award-badge-platinum' ? '👑' : '🥇');
-                                return `
-                                    <div class="competition-card" style="padding:0.8rem;" onclick="${a.product_id ? 'openProductById(' + a.product_id + ')' : ''}">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
-                                            <span class="award-badge ${cls}" style="font-size:0.7rem;">${icon} ${a.prize}</span>
-                                            <span style="font-size:0.75rem; color:var(--text-muted);">${a.year}年</span>
-                                        </div>
-                                        <div style="font-weight:700; color:var(--text-main); font-size:0.95rem; margin-bottom:0.2rem;">${a.brand_name || a.entry_name}</div>
-                                        <div style="font-size:0.8rem; color:var(--accent);">${a.brewery_name || ''}</div>
-                                    </div>
-                                `;
-                            }).join('');
-                        } else {
-                            awardsGrid.innerHTML = '<div style="color:var(--text-muted); grid-column:1/-1; text-align:center; padding:2rem;">受賞データがありません。</div>';
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Competition detail fetch error:', err);
-                        loading.style.display = 'none';
-                        content.style.display = 'block';
-                        stats.innerHTML = '<div style="color:red;">通信エラーが発生しました。</div>';
-                    });
-            };
-
-            window.openProductById = function(pid) {
-                hideModal('competitionModal');
-                const target = sakeData.find(item => item.id === pid);
-                if (target) {
-                    showDetailModal(target);
-                }
-            };
-
-            init();
+            
+            if (btnFirst) btnFirst.addEventListener('click', () => setPage(1));
+            if (btnPrev) btnPrev.addEventListener('click', () => changePage(-1));
+            if (btnNext) btnNext.addEventListener('click', () => changePage(1));
+            if (btnLast) btnLast.addEventListener('click', () => setPage(totalPages));
+            
+            loadData(1);
         });
+
+        // サーバーサイド・ページネーション ＆ データ状態管理
+let currentPage = 1;
+let totalPages = 1;
+let totalItems = 0;
+let filteredData = [];
+let sakeData = [];
+let searchTerm = "";
+let selectedBrewery = "";
+let selectedType = "";
+let selectedSsi = "";
+let selectedImage = "";
+let selectedCollection = "";
+let currentSort = "id_desc";
+
+function setCollectionFilter(type, btn) {
+    selectedCollection = type;
+    document.querySelectorAll('.collection-tab').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    loadData(1);
+}
+
+async function loadData(page = 1) {
+    currentPage = page;
+    const grid = document.getElementById('sakeGrid') || document.getElementById('grid');
+    const loader = document.getElementById('loadingOverlay');
+    
+    if (loader) loader.style.display = 'flex';
+    
+    const searchInput = document.getElementById('searchInput');
+    const breweryFilter = document.getElementById('breweryFilter');
+    const typeFilter = document.getElementById('typeFilter');
+    const ssiFilter = document.getElementById('ssiFilter');
+    const imageFilter = document.getElementById('imageFilter');
+    const sortOrder = document.getElementById('sortOrder');
+
+    if (searchInput) searchTerm = searchInput.value || '';
+    if (breweryFilter) selectedBrewery = breweryFilter.value || '';
+    if (typeFilter) selectedType = typeFilter.value || '';
+    if (ssiFilter) selectedSsi = ssiFilter.value || '';
+    if (imageFilter) selectedImage = imageFilter.value || '';
+    if (sortOrder) currentSort = sortOrder.value || 'id_desc';
+
+    const url = `/api/products?page=${currentPage}&limit=30&search=${encodeURIComponent(searchTerm)}&brewery=${encodeURIComponent(selectedBrewery)}&type=${encodeURIComponent(selectedType)}&ssi=${encodeURIComponent(selectedSsi)}&image_filter=${encodeURIComponent(selectedImage)}&collection=${encodeURIComponent(selectedCollection)}&sort=${encodeURIComponent(currentSort)}`;
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('API Error');
+        const data = await response.json();
+        
+        filteredData = data.items || [];
+        totalItems = data.total_items || 0;
+        totalPages = data.total_pages || 1;
+        
+        renderPage();
+    } catch (err) {
+        console.error('Failed to load data:', err);
+        if (grid) grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--danger); padding: 4rem 0;">データ取得エラーが発生しました: ${err.message}</div>`;
+    } finally {
+        if (loader) loader.style.display = 'none';
+    }
+}
+
+function changePage(delta) {
+    const newPage = currentPage + delta;
+    if (newPage >= 1 && newPage <= totalPages) {
+        loadData(newPage);
+        
+    }
+}
+
+function setPage(page) {
+    if (page >= 1 && page <= totalPages) {
+        loadData(page);
+        
+    }
+}
+
+function filterData() {
+    loadData(1);
+}
+
+
+function getSsiTagBadgeHtml(ssiType) {
+    if (!ssiType) return '';
+    if (ssiType === '薫酒') return '<span class="tag" style="background: rgba(244,114,182,0.2); color: #f472b6; border: 1px solid rgba(244,114,182,0.4);">🌸 薫酒 (フルーティー)</span>';
+    if (ssiType === '爽酒') return '<span class="tag" style="background: rgba(56,189,248,0.2); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4);">❄️ 爽酒 (スッキリ)</span>';
+    if (ssiType === '醇酒') return '<span class="tag" style="background: rgba(251,146,60,0.2); color: #fb923c; border: 1px solid rgba(251,146,60,0.4);">🌾 醇酒 (米の旨味)</span>';
+    if (ssiType === '熟酒') return '<span class="tag" style="background: rgba(167,139,250,0.2); color: #a78bfa; border: 1px solid rgba(167,139,250,0.4);">🍯 熟酒 (深み熟成)</span>';
+    return '';
+}
+
+function renderAwardBadgesHtml(awards) {
+    if (!awards || awards.length === 0) return '';
+    return '<div style="margin-top: 0.4rem; display: flex; flex-wrap: wrap; gap: 4px;">' +
+        awards.map(a => `<span style="background: rgba(212,175,55,0.15); color: #f59e0b; border: 1px solid rgba(212,175,55,0.3); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px;">🏆 ${a.prize || a.competition_name || '受賞'}</span>`).join('') +
+        '</div>';
+}
+
+function getSakePlaceholder(sakeType) {
+    return '/cropped_images/placeholder_noimage.jpg';
+}
+
+
+
+window.hideModal = function(id) {
+    const modal = document.getElementById(id);
+    if (modal) modal.classList.remove('active');
+    document.body.style.overflow = '';
+};
+
+// モーダル背景クリック時・ESCキーで閉じる
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+        e.target.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+        document.body.style.overflow = '';
+    }
+});
+
+function openModal(item) {
+    currentSake = item;
+    const detailModal = document.getElementById('detailModal');
+    if (!detailModal) return;
+
+    const detailImg = document.getElementById('detailImg');
+    const detailName = document.getElementById('detailName');
+    const detailSubName = document.getElementById('detailSubName');
+    const detailAwardsContainer = document.getElementById('detailAwardsContainer');
+    
+    const detBrewery = document.getElementById('detBrewery');
+    const detType = document.getElementById('detType');
+    const detAlcohol = document.getElementById('detAlcohol');
+    const detPolishing = document.getElementById('detPolishing');
+    const detMaterials = document.getElementById('detMaterials');
+    const detVariety = document.getElementById('detVariety');
+    const detYeast = document.getElementById('detYeast');
+    const detSmv = document.getElementById('detSmv');
+    const detAcidity = document.getElementById('detAcidity');
+    const detAminoAcidity = document.getElementById('detAminoAcidity');
+    const detHeatingType = document.getElementById('detHeatingType');
+    const detIsGenshu = document.getElementById('detIsGenshu');
+    const detBrewingMethod = document.getElementById('detBrewingMethod');
+    const detServingTemp = document.getElementById('detServingTemp');
+    const detAddress = document.getElementById('detAddress');
+    const detJanCode = document.getElementById('detJanCode');
+
+    if (detailImg) detailImg.src = item.cropped_image_path_front || getSakePlaceholder(item.sake_type);
+    if (detailName) detailName.textContent = item.name || item.brand_name || '名称不明';
+    if (detailSubName) detailSubName.textContent = item.spec_name || item.category || '';
+    if (detailAwardsContainer) detailAwardsContainer.innerHTML = renderAwardBadgesHtml(item.awards);
+
+    if (detBrewery) detBrewery.textContent = item.brewery || item.brewery_name || '-';
+    if (detType) detType.textContent = item.sake_type || item.category || '-';
+    if (detAlcohol) detAlcohol.textContent = item.alcohol_content ? (item.alcohol_content + '度') : (item.alcohol ? item.alcohol + '度' : '-');
+    if (detPolishing) detPolishing.textContent = item.polish_ratio ? (item.polish_ratio + '%') : '-';
+    if (detMaterials) detMaterials.textContent = item.ingredients || '-';
+    if (detVariety) detVariety.textContent = item.rice_variety || '-';
+    if (detYeast) detYeast.textContent = item.yeast || '-';
+    if (detSmv) detSmv.textContent = item.smv !== undefined && item.smv !== null ? item.smv : '-';
+    if (detAcidity) detAcidity.textContent = item.acidity !== undefined && item.acidity !== null ? item.acidity : '-';
+    if (detAminoAcidity) detAminoAcidity.textContent = item.amino_acidity !== undefined && item.amino_acidity !== null ? item.amino_acidity : '-';
+    if (detHeatingType) detHeatingType.textContent = item.heating_type || '-';
+    if (detIsGenshu) detIsGenshu.textContent = item.is_genshu ? '原酒' : '加水調整';
+    if (detBrewingMethod) detBrewingMethod.textContent = item.brewing_method || '-';
+    if (detServingTemp) detServingTemp.textContent = item.serving_temperature || '-';
+    if (detAddress) detAddress.textContent = item.prefecture || '-';
+    if (detJanCode) detJanCode.textContent = item.jan_code || '-';
+
+    detailModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function renderPage() {
+    if (typeof loadAiRecommendations === 'function') {
+        loadAiRecommendations();
+    }
+    const grid = document.getElementById('sakeGrid') || document.getElementById('grid');
+    const pageInfo = document.getElementById('pageInfo');
+    const btnFirst = document.getElementById('btnFirst');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const btnLast = document.getElementById('btnLast');
+    
+    if (!grid) return;
+    grid.innerHTML = '';
+    
+    if (btnFirst) btnFirst.disabled = (currentPage === 1);
+    if (btnPrev) btnPrev.disabled = (currentPage === 1);
+    if (btnNext) btnNext.disabled = (currentPage >= totalPages);
+    if (btnLast) btnLast.disabled = (currentPage >= totalPages);
+    
+    if (pageInfo) pageInfo.textContent = `${currentPage} / ${totalPages} ページ (合計 ${totalItems}件)`;
+    
+    if (!filteredData || filteredData.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 4rem 0;">該当する日本酒がありません。</div>';
+        return;
+    }
+    
+    filteredData.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'sake-card';
+        
+        const othersCount = item.ratings ? item.ratings.filter(r => r.user_name !== getCurrentUserName()).length : 0;
+        const hasMyComment = item.ratings ? item.ratings.some(r => r.user_name === getCurrentUserName()) : false;
+        const editBtnText = hasMyComment ? '✍️ コメントの修正' : '➕ コメントを追加';
+        
+        let indicatorHtml = '';
+        if (othersCount > 0) {
+            indicatorHtml = `<div class="comment-badge">💬 他のレビュー (${othersCount}件)</div>`;
+        }
+        
+        const ratings = item.ratings || [];
+        const totalScores = ratings.map(r => r.total_score).filter(s => s !== undefined && s !== null);
+        let ratingBadgeHtml = '';
+        if (totalScores.length > 0) {
+            const avg = (totalScores.reduce((a,b)=>a+b, 0) / totalScores.length).toFixed(1);
+            ratingBadgeHtml = `<div class="card-rating-badge">★ ${avg} (${totalScores.length})</div>`;
+        }
+        
+        const myRating = ratings.find(r => r.user_name === getCurrentUserName());
+        let myRatingBadgeHtml = '';
+        if (myRating && myRating.total_score !== undefined && myRating.total_score !== null) {
+            myRatingBadgeHtml = `<div class="card-my-rating-badge">あなた: ★${myRating.total_score.toFixed(1)}</div>`;
+        }
+        
+        const isAiImage = item.cropped_image_path_front && item.cropped_image_path_front.includes('placeholder_');
+        let imageBadgeHtml = '';
+        if (item.cropped_image_path_front && !isAiImage) {
+            imageBadgeHtml = `<div class="card-my-rating-badge" style="background: rgba(59, 130, 246, 0.85); border-color: rgba(59, 130, 246, 0.4); top: auto; bottom: 10px; left: 10px; font-size: 0.65rem;">📸 実写写真</div>`;
+        } else if (isAiImage) {
+            imageBadgeHtml = `<div class="card-ai-image-badge">AIイメージ</div>`;
+        } else if (!item.cropped_image_path_front) {
+            imageBadgeHtml = `<div class="card-ai-image-badge" style="background: rgba(239, 68, 68, 0.85); border: 1px solid rgba(239, 68, 68, 0.4); color: white;">🚫 画像未登録</div>`;
+        }
+
+        card.innerHTML = `
+            <div class="sake-id">ID: ${String(item.id).padStart(4, '0')}</div>
+            <div class="image-container">
+                ${myRatingBadgeHtml}
+                ${ratingBadgeHtml}
+                ${imageBadgeHtml}
+                <img src="${item.cropped_image_path_front || getSakePlaceholder(item.sake_type)}" alt="${item.name}">
+            </div>
+            <div class="sake-info">
+                <div class="sake-brewery">${item.brewery || '不明'}</div>
+                <div class="sake-name">${item.name}</div>
+                <div style="margin-bottom: 0.5rem; height: 1.5rem;">${indicatorHtml}</div>
+                <div class="tag-container">
+                    <span class="tag">${item.alcohol_content ? item.alcohol_content + '度' : '度数不明'}</span>
+                    <span class="tag tag-type">${item.sake_type || item.category || '特定名称不明'}</span>
+                    ${getSsiTagBadgeHtml(item.ssi_type)}
+                </div>
+                ${renderAwardBadgesHtml(item.awards)}
+            </div>
+            <div class="card-actions">
+                <button class="action-btn btn-edit" onclick="event.stopPropagation(); openEditModal(${item.id})">${editBtnText}</button>
+                <button class="action-btn btn-others" onclick="event.stopPropagation(); openOthersModal(${item.id})">🔍 他のコメント</button>
+            </div>
+        `;
+
+        card.addEventListener('click', () => openModal(item));
+        grid.appendChild(card);
+    });
+}
     </script>
 
 <script>

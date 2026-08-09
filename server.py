@@ -1,3 +1,20 @@
+def clean_img_url(p):
+    if not p: return ''
+    p_str = str(p).replace('\\', '/').strip()
+    idx = p_str.find('cropped_images')
+    if idx != -1:
+        return '/' + p_str[idx:]
+    return p_str
+
+# In-Memory Cache Globals
+PRODUCTS_CACHE_BYTES = None
+MAP_CACHE_BYTES = None
+
+def invalidate_server_cache():
+    global PRODUCTS_CACHE_BYTES, MAP_CACHE_BYTES
+    PRODUCTS_CACHE_BYTES = None
+    MAP_CACHE_BYTES = None
+
 import os
 import sqlite3
 import json
@@ -317,8 +334,12 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             return os.path.join(BASE_DIR, "app", "viewer.html")
         elif path == "/admin" or path == "/admin.html":
             return os.path.join(BASE_DIR, "app", "admin.html")
+        elif path == "/map" or path == "/map.html":
+            return os.path.join(BASE_DIR, "app", "map.html")
         elif path == "/brewery_admin" or path == "/brewery_admin.html":
             return os.path.join(BASE_DIR, "app", "brewery_admin.html")
+        elif path == "/mobile" or path == "/mobile.html":
+            return os.path.join(BASE_DIR, "app", "mobile_viewer.html")
         return super().translate_path(path)
     def do_GET(self):
         if self.path.startswith("/api/image/proxy"):
@@ -356,7 +377,291 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.end_headers()
             return
             
-        elif self.path == "/api/products":
+        elif self.path == "/api/products" or self.path.startswith("/api/products?"):
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed_url.query)
+            
+            page = int(params.get('page', [1])[0])
+            limit = int(params.get('limit', [30])[0])
+            search = params.get('search', [''])[0].strip()
+            brewery = params.get('brewery', [''])[0].strip()
+            sake_type = params.get('type', [''])[0].strip()
+            ssi = params.get('ssi', [''])[0].strip()
+            image_filter = params.get('image_filter', [''])[0].strip()
+            collection = params.get('collection', [''])[0].strip()
+            sort_order = params.get('sort', ['id_desc'])[0].strip()
+
+            offset = (page - 1) * limit
+            
+            conn = None
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                where_clauses = ["status != 'rejected'"]
+                query_args = []
+
+                if search:
+                    where_clauses.append("(LOWER(brand_name) LIKE LOWER(?) OR LOWER(brewery_name) LIKE LOWER(?) OR LOWER(spec_name) LIKE LOWER(?))")
+                    term = f"%{search}%"
+                    query_args.extend([term, term, term])
+
+                if brewery:
+                    where_clauses.append("(brewery_name LIKE ? OR brand_name LIKE ?)")
+                    b_term = f"%{brewery}%"
+                    query_args.extend([b_term, b_term])
+
+                if sake_type:
+                    where_clauses.append("(category LIKE ? OR spec_name LIKE ?)")
+                    t_term = f"%{sake_type}%"
+                    query_args.extend([t_term, t_term])
+
+                if ssi:
+                    where_clauses.append("ssi_type = ?")
+                    query_args.append(ssi)
+
+                if image_filter == 'has_image':
+                    where_clauses.append("(cropped_image_path_front IS NOT NULL AND cropped_image_path_front != '')")
+                elif image_filter == 'no_image':
+                    where_clauses.append("(cropped_image_path_front IS NULL OR cropped_image_path_front = '')")
+
+                if collection == 'gold_award':
+                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE is_gold_award = 1 AND product_id IS NOT NULL)")
+                elif collection == 'iwc':
+                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%IWC%' AND product_id IS NOT NULL)")
+                elif collection == 'fine_sake':
+                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%ワイングラス%' AND product_id IS NOT NULL)")
+                elif collection == 'kura_master':
+                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%Kura Master%' AND product_id IS NOT NULL)")
+                elif collection == 'sparkling':
+                    where_clauses.append("(category LIKE '%スパークリング%' OR category LIKE '%発泡%')")
+                elif collection == 'shochu_craft':
+                    where_clauses.append("(category LIKE '%焼酎%' OR category LIKE '%クラフト%')")
+                elif collection == 'kunshu':
+                    where_clauses.append("(ssi_type = '薫酒' OR category LIKE '%純米大吟醸%' OR category LIKE '%大吟醸%')")
+                elif collection == 'junmai':
+                    where_clauses.append("(ssi_type = '醇酒' OR category LIKE '%純米%')")
+
+                where_str = " AND ".join(where_clauses)
+
+                # Total count query
+                count_sql = f"SELECT COUNT(*) FROM products WHERE {where_str}"
+                cursor.execute(count_sql, query_args)
+                total_items = cursor.fetchone()[0]
+                total_pages = max(1, (total_items + limit - 1) // limit)
+
+                # Order clause
+                order_clause = "ORDER BY id DESC"
+                if sort_order == 'id_asc':
+                    order_clause = "ORDER BY id ASC"
+                elif sort_order == 'name_asc':
+                    order_clause = "ORDER BY brand_name ASC"
+
+                # Main Data query with LIMIT & OFFSET
+                data_sql = f"SELECT * FROM products WHERE {where_str} {order_clause} LIMIT ? OFFSET ?"
+                cursor.execute(data_sql, query_args + [limit, offset])
+                products = [dict(r) for r in cursor.fetchall()]
+
+                # Attach awards & ratings ONLY for the 30 returned products
+                if products:
+                    p_ids = [p['id'] for p in products]
+                    p_placeholders = ','.join('?' * len(p_ids))
+                    
+                    cursor.execute(f"SELECT * FROM awards WHERE product_id IN ({p_placeholders})", p_ids)
+                    awards_rows = cursor.fetchall()
+                    awards_map = {}
+                    for a in awards_rows:
+                        pid = a['product_id']
+                        if pid not in awards_map: awards_map[pid] = []
+                        awards_map[pid].append(dict(a))
+
+                    cursor.execute(f"SELECT * FROM user_flavor_ratings WHERE product_id IN ({p_placeholders})", p_ids)
+                    ratings_rows = cursor.fetchall()
+                    ratings_map = {}
+                    for r in ratings_rows:
+                        pid = r['product_id']
+                        if pid not in ratings_map: ratings_map[pid] = []
+                        ratings_map[pid].append(dict(r))
+
+                    for p in products:
+                        pid = p['id']
+                        p['name'] = p.get('brand_name') or ''
+                        p['sake_type'] = p.get('category') or ''
+                        p['brewery'] = p.get('brewery_name') or ''
+                        p['cropped_image_path_front'] = clean_img_url(p.get('cropped_image_path_front'))
+                        p['alcohol_content'] = p.get('alcohol')
+                        p['awards'] = awards_map.get(pid, [])
+                        p['ratings'] = ratings_map.get(pid, [])
+
+                res_payload = {
+                    "items": products,
+                    "page": page,
+                    "limit": limit,
+                    "total_items": total_items,
+                    "total_pages": total_pages
+                }
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps(res_payload, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                print(f"Products API error: {e}")
+                self.send_response(500)
+                self.end_headers()
+            finally:
+                if conn: conn.close()
+            return
+        elif self.path.startswith("/api/recommendations"):
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed_url.query)
+            user_name = params.get('user', ['hitoshi'])[0]
+            
+            conn = None
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                # Fetch user profile preference
+                cursor.execute("SELECT * FROM user_profiles WHERE user_name = ?", (user_name,))
+                u_profile = cursor.fetchone()
+                
+                # Fetch all products with image or high ratings
+                cursor.execute("SELECT * FROM products ORDER BY id DESC LIMIT 500")
+                products = [dict(r) for r in cursor.fetchall()]
+                
+                recs = []
+                for p in products:
+                    score = 0
+                    reason = ""
+                    brand = p.get('brand_name') or ''
+                    spec = p.get('spec_name') or ''
+                    cat = p.get('category') or ''
+                    ssi = p.get('ssi_type') or ''
+                    text = f"{brand} {spec} {cat} {ssi}"
+                    
+                    if user_name == 'hitoshi':
+                        if ssi == '醇酒' or '純米' in text or '山廃' in text or '生酛' in text:
+                            score += 50
+                            reason = "あなたの好み: お米の豊かな旨味としっかりした酸が広がる純米・山廃仕込み"
+                        elif '原酒' in text or '辛口' in text:
+                            score += 30
+                            reason = "あなたの好み: 飲み応えのあるしっかりした骨太な味わい"
+                    elif user_name == 'nao':
+                        if ssi == '薫酒' or '純米大吟醸' in text or 'スパークリング' in text:
+                            score += 50
+                            reason = "あなたの好み: 華やかでフルーティーな吟醸香とスッキリした飲みやすさ"
+                        elif '大吟醸' in text or 'リキュール' in text:
+                            score += 30
+                            reason = "あなたの好み: フルーティーな甘みとみずみずしい香り"
+                    else:
+                        score += 20
+                        reason = "全国新酒鑑評会・Kura Masterでも高評価の人気銘柄"
+                        
+                    if p.get('cropped_image_path_front'):
+                        score += 15
+                        
+                    if score > 0:
+                        p['rec_score'] = score
+                        p['rec_reason'] = reason
+                        recs.append(p)
+                        
+                recs.sort(key=lambda x: x['rec_score'], reverse=True)
+                top_recs = recs[:5]
+                if top_recs:
+                    top_ids = [p['id'] for p in top_recs]
+                    placeholders = ','.join('?' * len(top_ids))
+                    cursor.execute(f"SELECT * FROM user_flavor_ratings WHERE product_id IN ({placeholders})", top_ids)
+                    ratings_map = {}
+                    for r in cursor.fetchall():
+                        pid = r['product_id']
+                        if pid not in ratings_map: ratings_map[pid] = []
+                        ratings_map[pid].append(dict(r))
+                    for p in top_recs:
+                        p['ratings'] = ratings_map.get(p['id'], [])
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps(top_recs, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.end_headers()
+            finally:
+                if conn: conn.close()
+            return
+        elif self.path.startswith("/api/brewery_admin/analytics"):
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed_url.query)
+            brewery = params.get('brewery', ['旭酒造'])[0]
+            
+            conn = None
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                # Fetch all product IDs for this brewery
+                cursor.execute("SELECT id, brand_name, spec_name FROM products WHERE brewery_name LIKE ? OR brand_name LIKE ?", (f"%{brewery}%", f"%{brewery}%"))
+                b_prods = cursor.fetchall()
+                prod_ids = [p['id'] for p in b_prods]
+                
+                if not prod_ids:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json; charset=utf-8')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"total_reviews": 0, "avg_rating": 0, "ssi_counts": {}, "reviews": []}, ensure_ascii=False).encode('utf-8'))
+                    return
+
+                placeholders = ','.join('?' * len(prod_ids))
+                cursor.execute(f"SELECT r.*, p.brand_name, p.spec_name FROM user_flavor_ratings r JOIN products p ON r.product_id = p.id WHERE r.product_id IN ({placeholders}) ORDER BY r.id DESC", prod_ids)
+                ratings = [dict(r) for r in cursor.fetchall()]
+                
+                total_reviews = len(ratings)
+                scores = [r['total_score'] for r in ratings if r['total_score'] is not None]
+                avg_rating = round(sum(scores) / len(scores), 2) if scores else 0.0
+                
+                ssi_counts = {"薫酒": 0, "爽酒": 0, "醇酒": 0, "熟酒": 0}
+                for r in ratings:
+                    ssi = r.get('ssi_type')
+                    if ssi in ssi_counts:
+                        ssi_counts[ssi] += 1
+                        
+                res_data = {
+                    "total_reviews": total_reviews,
+                    "avg_rating": avg_rating,
+                    "ssi_counts": ssi_counts,
+                    "reviews": ratings[:20]
+                }
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps(res_data, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                self.send_response(500)
+                self.end_headers()
+            finally:
+                if conn: conn.close()
+            return
+        elif self.path.startswith("/api/breweries/map"):
+            global MAP_CACHE_BYTES
+            if MAP_CACHE_BYTES is not None:
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(MAP_CACHE_BYTES)
+                return
             conn = None
             try:
                 conn = sqlite3.connect(DB_PATH)
@@ -364,219 +669,28 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 cursor = conn.cursor()
                 
                 cursor.execute("""
-                    SELECT 
-                        p.id as id,
-                        p.brand_name as name,
-                        p.spec_name as sub_name,
-                        p.brewery_name as brewery,
-                        p.category as sake_type,
-                        p.alcohol as alcohol_content,
-                        p.ingredients as raw_materials,
-                        p.polish_ratio as polishing_rate,
-                        p.rice_variety as rice_variety,
-                        p.yeast as yeast,
-                        p.smv as smv,
-                        p.acidity as acidity,
-                        p.amino_acidity as amino_acidity,
-                        p.cropped_image_path_front as cropped_image_path_front,
-                        p.cropped_image_path_back as cropped_image_path_back,
-                        p.ssi_type as ssi_type,
-                        p.body_level as body_level,
-                        p.aroma_level as aroma_level,
-                        p.comment as comment,
-                        p.heating_type as heating_type,
-                        p.is_genshu as is_genshu,
-                        p.brewing_method as brewing_method,
-                        p.serving_temperature as serving_temperature,
-                        p.jan_code as jan_code,
-                        p.prefecture as prefecture
-                    FROM products p
-                    ORDER BY p.id ASC
+                    SELECT b.id, b.name, b.kura_name, b.prefecture, b.city, b.address, 
+                           b.latitude, b.longitude, b.founding_year, b.website, b.shop_available, b.visitation_allowed,
+                           (SELECT brand_name FROM products p WHERE p.brewery_name LIKE '%' || b.name || '%' OR b.name LIKE '%' || p.brewery_name || '%' LIMIT 1) as rep_brand,
+                           (SELECT cropped_image_path_front FROM products p WHERE (p.brewery_name LIKE '%' || b.name || '%' OR b.name LIKE '%' || p.brewery_name || '%') AND cropped_image_path_front IS NOT NULL LIMIT 1) as rep_image
+                    FROM breweries b
+                    WHERE b.status != 'rejected' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL
                 """)
-                products = [dict(row) for row in cursor.fetchall()]
+                breweries = [dict(r) for r in cursor.fetchall()]
                 
-                # 2. 口コミ全件を一括取得
-                cursor.execute("""
-                    SELECT product_id, ssi_type, body_level, aroma_level, comment, user_name, created_at, rating_image, rating_image_2, total_score, taste_score, aroma_score, image_accuracy_score
-                    FROM user_flavor_ratings
-                    ORDER BY id DESC
-                """)
-                all_ratings = [dict(row) for row in cursor.fetchall()]
-                
-                # 3. ratings を product_id ごとにマッピング
-                ratings_map = {}
-                for r in all_ratings:
-                    pid = r['product_id']
-                    if pid not in ratings_map:
-                        ratings_map[pid] = []
-                    ratings_map[pid].append(r)
-                
-                # 3. awards を厳格な完全一致 (entry_name == spec_name / brand_name) でマッピング
-                product_awards_map = {}
-                try:
-                    cursor.execute("""
-                        SELECT a.id, a.competition_id, c.name as competition_name, a.year, a.prize, a.category as award_category, a.entry_name
-                        FROM awards a
-                        JOIN competitions c ON a.competition_id = c.id
-                    """)
-                    all_awards = [dict(row) for row in cursor.fetchall()]
-                    
-                    product_by_spec = {}
-                    product_by_brand = {}
-                    for p in products:
-                        pid = p['id']
-                        bname = (p.get('name') or p.get('brand_name') or '').strip()
-                        sname = (p.get('sub_name') or p.get('spec_name') or '').strip()
-                        if bname:
-                            product_by_brand.setdefault(bname, []).append(pid)
-                        if sname:
-                            product_by_spec.setdefault(sname, []).append(pid)
-                            
-                    for aw in all_awards:
-                        entry = (aw['entry_name'] or '').strip()
-                        if not entry:
-                            continue
-                        matched_pids = set()
-                        # 1. spec_name との完全一致
-                        if entry in product_by_spec:
-                            for pid in product_by_spec[entry]:
-                                matched_pids.add(pid)
-                        # 2. brand_name との完全一致
-                        elif entry in product_by_brand:
-                            for pid in product_by_brand[entry]:
-                                matched_pids.add(pid)
-                                
-                        for pid in matched_pids:
-                            product_awards_map.setdefault(pid, []).append(aw)
-                except Exception as e:
-                    print(f"Awards query warning: {e}")
-                
-                # 4. products に結合し、外部画像はプロキシ経由にし、ローカルは相対パス補正
-                import urllib.parse
-                import re
-
-                def parse_numeric(val):
-                    if not val or val == "非公開":
-                        return None
-                    matches = re.findall(r'[-+]?\d+(?:\.\d+)?', str(val))
-                    if not matches:
-                        return None
-                    floats = [float(m) for m in matches]
-                    return sum(floats) / len(floats)
-
-                def calculate_flavor_coordinates(smv_str, acidity_str):
-                    smv = parse_numeric(smv_str)
-                    acidity = parse_numeric(acidity_str)
-                    if smv is None or acidity is None:
-                        return None, None
-                    try:
-                        amakarado = 193593.0 / (1443.0 + smv) - 1.16 * acidity - 132.57
-                        noutando = 94545.0 / (1443.0 + smv) + 1.88 * acidity - 68.54
-                        # 一般的なマップに合わせて右側(+)を辛口、左側(-)を甘口とするため符号を反転
-                        flavor_x = round(-1.0 * amakarado, 2)
-                        flavor_y = round(noutando, 2)
-                        return flavor_x, flavor_y
-                    except ZeroDivisionError:
-                        return None, None
-
-                for p in products:
-                    p['ratings'] = ratings_map.get(p['id'], [])
-                    p['awards'] = product_awards_map.get(p['id'], [])
-                    
-                    # 画像選出ロジック: 口コミ投稿の写真を優先し、精度スコア順に選出
-                    ratings_list = p['ratings']
-                    img_ratings = [r for r in ratings_list if r.get('rating_image')]
-                    if img_ratings:
-                        def img_score(r):
-                            acc = float(r.get('image_accuracy_score') or 1.0) * 50
-                            usr = 100 if r.get('user_name') == 'hitocie' else 20
-                            tot = float(r.get('total_score') or 0.0) * 10
-                            has_c = 20 if r.get('comment') else 0
-                            return acc + usr + tot + has_c
-                        best_r = max(img_ratings, key=img_score)
-                        p['cropped_image_path_front'] = best_r['rating_image']
-                    else:
-                        p['cropped_image_path_front'] = 'cropped_images/placeholder_noimage.jpg'
-                    
-                    # 味わいマップ座標の動的計算
-                    fx, fy = calculate_flavor_coordinates(p.get('smv'), p.get('acidity'))
-                    p['flavor_x'] = fx
-                    p['flavor_y'] = fy
-
-                    if p['cropped_image_path_front']:
-                        try:
-                            val = p['cropped_image_path_front']
-                            if val.startswith("http://") or val.startswith("https://") or val.startswith("http:/") or val.startswith("https:/"):
-                                if val.startswith("https:/") and not val.startswith("https://"):
-                                    val = val.replace("https:/", "https://", 1)
-                                elif val.startswith("http:/") and not val.startswith("http://"):
-                                    val = val.replace("http:/", "http://", 1)
-                                p['cropped_image_path_front'] = f"/api/image/proxy?url={urllib.parse.quote(val)}"
-                            elif not val.startswith("data:image/") and not val.startswith("uploaded_images/") and not val.startswith("cropped_images/"):
-                                p['cropped_image_path_front'] = os.path.relpath(val, BASE_DIR).replace('\\', '/')
-                        except Exception:
-                            pass
-                            
-                    if p['cropped_image_path_back']:
-                        try:
-                            val = p['cropped_image_path_back']
-                            if val.startswith("http://") or val.startswith("https://") or val.startswith("http:/") or val.startswith("https:/"):
-                                if val.startswith("https:/") and not val.startswith("https://"):
-                                    val = val.replace("https:/", "https://", 1)
-                                elif val.startswith("http:/") and not val.startswith("http://"):
-                                    val = val.replace("http:/", "http://", 1)
-                                p['cropped_image_path_back'] = f"/api/image/proxy?url={urllib.parse.quote(val)}"
-                            elif not val.startswith("data:image/") and not val.startswith("uploaded_images/") and not val.startswith("cropped_images/"):
-                                p['cropped_image_path_back'] = os.path.relpath(val, BASE_DIR).replace('\\', '/')
-                        except Exception:
-                            pass
-                
-                
-                    # 画像優先度判定ロジック:
-                    # (1) 酒蔵管理者が登録した画像 (cropped_image_path_front)
-                    # (2) なければコメント写真の中で最もラベル精度が高いもの (image_accuracy_score)
-                    # (3) なければ None (画面上は空白表示)
-                    best_img = None
-                    if p.get('cropped_image_path_front') and str(p.get('cropped_image_path_front')).strip():
-                        best_img = p['cropped_image_path_front']
-                        
-                    if not best_img and p.get('ratings'):
-                        r_with_imgs = [r for r in p['ratings'] if r.get('rating_image') and str(r.get('rating_image')).strip()]
-                        if r_with_imgs:
-                            r_with_imgs.sort(key=lambda x: float(x.get('image_accuracy_score') or 0), reverse=True)
-                            best_img = r_with_imgs[0]['rating_image']
-                            
-                    if best_img:
-                        val = best_img
-                        if val.startswith("http://") or val.startswith("https://") or val.startswith("http:/") or val.startswith("https:/"):
-                            if val.startswith("https:/") and not val.startswith("https://"):
-                                val = val.replace("https:/", "https://", 1)
-                            elif val.startswith("http:/") and not val.startswith("http://"):
-                                val = val.replace("http:/", "http://", 1)
-                            best_img = f"/api/image/proxy?url={urllib.parse.quote(val)}"
-                        elif not val.startswith("data:image/") and not val.startswith("uploaded_images/") and not val.startswith("cropped_images/"):
-                            try:
-                                best_img = os.path.relpath(val, BASE_DIR).replace('\\', '/')
-                            except Exception: pass
-                    
-                    p['display_image'] = best_img
-
                 self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                self.wfile.write(json.dumps(products, ensure_ascii=False).encode('utf-8'))
+                map_bytes = json.dumps(breweries, ensure_ascii=False).encode('utf-8')
+                MAP_CACHE_BYTES = map_bytes
+                self.wfile.write(map_bytes)
             except Exception as e:
                 self.send_response(500)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                err_res = {"status": "error", "message": f"製品取得に失敗しました: {str(e)}"}
-                self.wfile.write(json.dumps(err_res).encode('utf-8'))
-                print(f"API製品取得エラー: {e}")
             finally:
-                if conn:
-                    conn.close()
+                if conn: conn.close()
+            return
         elif self.path.startswith("/api/brewery_admin/products"):
             import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
