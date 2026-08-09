@@ -910,6 +910,10 @@
             <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
             <span>おすすめ</span>
         </div>
+        <div class="nav-item" id="navMyRatings">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <span>マイ評価</span>
+        </div>
     </nav>
 
     <!-- 詳細モーダル -->
@@ -1207,6 +1211,16 @@
                 loadRecommendationsList();
             });
 
+            document.getElementById('navMyRatings').addEventListener('click', () => {
+                if (!currentUser) {
+                    loginModal.style.display = 'flex';
+                    return;
+                }
+                currentMode = 'my_ratings';
+                updateNavUI();
+                loadMyRatings();
+            });
+
             // モーダル閉じる
             backBtn.addEventListener('click', () => {
                 detailModal.classList.remove('show');
@@ -1344,6 +1358,7 @@
         function updateNavUI() {
             document.getElementById('navHome').classList.toggle('active', currentMode === 'home');
             document.getElementById('navRec').classList.toggle('active', currentMode === 'rec');
+            document.getElementById('navMyRatings').classList.toggle('active', currentMode === 'my_ratings');
         }
 
         // トップ画面のおすすめ横スクロールカルーセル
@@ -1464,6 +1479,41 @@
                     sakeListEl.innerHTML = '<div style="text-align:center; padding: 3rem 1rem; color: #64748b;">おすすめデータが見つかりませんでした</div>';
                 } else {
                     renderItems(items, true);
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                isFetching = false;
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        async function loadMyRatings() {
+            if (isFetching || !currentUser) return;
+            isFetching = true;
+            sakeListEl.innerHTML = '';
+            loadingEl.style.display = 'block';
+            hasMore = false;
+            listTitle.textContent = `📝 ${currentUser.display_name || currentUser.user_name}様のマイ評価・レビュー履歴`;
+
+            try {
+                const q = new URLSearchParams({
+                    page: 1,
+                    limit: 100,
+                    rated_by: currentUser.user_name,
+                    sort: 'id_desc'
+                });
+                const res = await fetch(`/api/products?${q.toString()}`);
+                const data = await res.json();
+                
+                if (!data.items || data.items.length === 0) {
+                    sakeListEl.innerHTML = `
+                        <div style="text-align:center; padding: 3rem 1rem; color: #64748b; font-weight: 600;">
+                            <div style="font-size:2.5rem; margin-bottom:0.5rem;">🍶</div>
+                            まだ評価・コメントした日本酒がありません。<br><br>気になったお酒をタップして「コメントと評価」を投稿してみましょう！
+                        </div>`;
+                } else {
+                    renderItems(data.items);
                 }
             } catch (e) {
                 console.error(e);

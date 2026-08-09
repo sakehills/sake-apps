@@ -398,6 +398,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             ssi = params.get('ssi', [''])[0].strip()
             image_filter = params.get('image_filter', [''])[0].strip()
             collection = params.get('collection', [''])[0].strip()
+            rated_by = params.get('rated_by', [''])[0].strip()
             sort_order = params.get('sort', ['id_desc'])[0].strip()
 
             offset = (page - 1) * limit
@@ -410,6 +411,10 @@ class SakeApiServer(SimpleHTTPRequestHandler):
 
                 where_clauses = ["p.status != 'rejected'"]
                 query_args = []
+
+                if rated_by:
+                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM user_flavor_ratings WHERE user_name = ?)")
+                    query_args.append(rated_by)
 
                 if search:
                     where_clauses.append("(LOWER(p.brand_name) LIKE LOWER(?) OR LOWER(p.brewery_name) LIKE LOWER(?) OR LOWER(p.spec_name) LIKE LOWER(?) OR LOWER(COALESCE(p.prefecture, b.prefecture, '')) LIKE LOWER(?))")
