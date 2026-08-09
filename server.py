@@ -329,6 +329,8 @@ def generate_ai_comment_for_product(conn, product_id, user_name, image_path, ima
 
 class SakeApiServer(SimpleHTTPRequestHandler):
     def translate_path(self, path):
+        if not hasattr(self, 'directory'):
+            self.directory = BASE_DIR
         # クエリ文字列(?...)やアンカー(#...)を分離して純粋なパスを取得
         clean_path = path.split('?')[0].split('#')[0]
         if clean_path.endswith('/') and len(clean_path) > 1:

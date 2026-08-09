@@ -40,6 +40,8 @@ def application(environ, start_response):
             self.command = method
             self.requestline = f"{method} {path} HTTP/1.1"
             self.client_address = (environ.get('REMOTE_ADDR', '127.0.0.1'), 80)
+            self.directory = BASE_DIR
+            self.server = None
 
             # WSGI の environ から HTTP ヘッダーを生成
             from http.client import HTTPMessage
