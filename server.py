@@ -338,7 +338,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             return os.path.join(BASE_DIR, "app", "map.html")
         elif path == "/brewery_admin" or path == "/brewery_admin.html":
             return os.path.join(BASE_DIR, "app", "brewery_admin.html")
-        elif path == "/mobile" or path == "/mobile.html":
+        elif path == "/mobile" or path == "/mobile.html" or path == "/mobile_viewer.html" or path == "/mobile_viewer":
             return os.path.join(BASE_DIR, "app", "mobile_viewer.html")
         return super().translate_path(path)
     def do_GET(self):
@@ -386,6 +386,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             limit = int(params.get('limit', [30])[0])
             search = params.get('search', [''])[0].strip()
             brewery = params.get('brewery', [''])[0].strip()
+            prefecture = params.get('prefecture', [''])[0].strip()
             sake_type = params.get('type', [''])[0].strip()
             ssi = params.get('ssi', [''])[0].strip()
             image_filter = params.get('image_filter', [''])[0].strip()
@@ -400,67 +401,125 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
-                where_clauses = ["status != 'rejected'"]
+                where_clauses = ["p.status != 'rejected'"]
                 query_args = []
 
                 if search:
-                    where_clauses.append("(LOWER(brand_name) LIKE LOWER(?) OR LOWER(brewery_name) LIKE LOWER(?) OR LOWER(spec_name) LIKE LOWER(?))")
+                    where_clauses.append("(LOWER(p.brand_name) LIKE LOWER(?) OR LOWER(p.brewery_name) LIKE LOWER(?) OR LOWER(p.spec_name) LIKE LOWER(?) OR LOWER(COALESCE(p.prefecture, b.prefecture, '')) LIKE LOWER(?))")
                     term = f"%{search}%"
-                    query_args.extend([term, term, term])
+                    query_args.extend([term, term, term, term])
 
                 if brewery:
-                    where_clauses.append("(brewery_name LIKE ? OR brand_name LIKE ?)")
+                    where_clauses.append("(p.brewery_name LIKE ? OR p.brand_name LIKE ?)")
                     b_term = f"%{brewery}%"
                     query_args.extend([b_term, b_term])
 
+                if prefecture:
+                    where_clauses.append("(p.prefecture LIKE ? OR b.prefecture LIKE ?)")
+                    p_term = f"%{prefecture}%"
+                    query_args.extend([p_term, p_term])
+
                 if sake_type:
-                    where_clauses.append("(category LIKE ? OR spec_name LIKE ?)")
+                    where_clauses.append("(p.category LIKE ? OR p.spec_name LIKE ?)")
                     t_term = f"%{sake_type}%"
                     query_args.extend([t_term, t_term])
 
                 if ssi:
-                    where_clauses.append("ssi_type = ?")
+                    where_clauses.append("p.ssi_type = ?")
                     query_args.append(ssi)
 
                 if image_filter == 'has_image':
-                    where_clauses.append("(cropped_image_path_front IS NOT NULL AND cropped_image_path_front != '')")
+                    where_clauses.append("(p.cropped_image_path_front IS NOT NULL AND p.cropped_image_path_front != '')")
                 elif image_filter == 'no_image':
-                    where_clauses.append("(cropped_image_path_front IS NULL OR cropped_image_path_front = '')")
+                    where_clauses.append("(p.cropped_image_path_front IS NULL OR p.cropped_image_path_front = '')")
 
                 if collection == 'gold_award':
-                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE is_gold_award = 1 AND product_id IS NOT NULL)")
+                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM awards WHERE is_gold_award = 1 AND product_id IS NOT NULL)")
                 elif collection == 'iwc':
-                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%IWC%' AND product_id IS NOT NULL)")
+                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%IWC%' AND product_id IS NOT NULL)")
                 elif collection == 'fine_sake':
-                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%ワイングラス%' AND product_id IS NOT NULL)")
+                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%ワイングラス%' AND product_id IS NOT NULL)")
                 elif collection == 'kura_master':
-                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%Kura Master%' AND product_id IS NOT NULL)")
+                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%Kura Master%' AND product_id IS NOT NULL)")
                 elif collection == 'sparkling':
-                    where_clauses.append("(category LIKE '%スパークリング%' OR category LIKE '%発泡%')")
+                    where_clauses.append("(p.category LIKE '%スパークリング%' OR p.category LIKE '%発泡%')")
                 elif collection == 'shochu_craft':
-                    where_clauses.append("(category LIKE '%焼酎%' OR category LIKE '%クラフト%')")
+                    where_clauses.append("(p.category LIKE '%焼酎%' OR p.category LIKE '%クラフト%')")
                 elif collection == 'kunshu':
-                    where_clauses.append("(ssi_type = '薫酒' OR category LIKE '%純米大吟醸%' OR category LIKE '%大吟醸%')")
+                    where_clauses.append("(p.ssi_type = '薫酒' OR p.category LIKE '%純米大吟醸%' OR p.category LIKE '%大吟醸%')")
                 elif collection == 'junmai':
-                    where_clauses.append("(ssi_type = '醇酒' OR category LIKE '%純米%')")
+                    where_clauses.append("(p.ssi_type = '醇酒' OR p.category LIKE '%純米%')")
 
                 where_str = " AND ".join(where_clauses)
+                from_str = "products p LEFT JOIN breweries b ON p.brewery_name = b.name"
 
                 # Total count query
-                count_sql = f"SELECT COUNT(*) FROM products WHERE {where_str}"
+                count_sql = f"SELECT COUNT(*) FROM {from_str} WHERE {where_str}"
                 cursor.execute(count_sql, query_args)
                 total_items = cursor.fetchone()[0]
                 total_pages = max(1, (total_items + limit - 1) // limit)
 
                 # Order clause
-                order_clause = "ORDER BY id DESC"
-                if sort_order == 'id_asc':
-                    order_clause = "ORDER BY id ASC"
-                elif sort_order == 'name_asc':
-                    order_clause = "ORDER BY brand_name ASC"
+                order_clause = "ORDER BY p.id DESC"
+                if sort_order == 'pref_asc':
+                    order_clause = """ORDER BY (CASE 
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%北海道%' THEN 1
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%青森%' THEN 2
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%岩手%' THEN 3
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%宮城%' THEN 4
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%秋田%' THEN 5
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%山形%' THEN 6
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%福島%' THEN 7
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%茨城%' THEN 8
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%栃木%' THEN 9
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%群馬%' THEN 10
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%埼玉%' THEN 11
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%千葉%' THEN 12
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%東京%' THEN 13
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%神奈川%' THEN 14
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%新潟%' THEN 15
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%富山%' THEN 16
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%石川%' THEN 17
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%福井%' THEN 18
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%山梨%' THEN 19
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%長野%' THEN 20
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%岐阜%' THEN 21
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%静岡%' THEN 22
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%愛知%' THEN 23
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%三重%' THEN 24
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%滋賀%' THEN 25
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%京都%' THEN 26
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%大阪%' THEN 27
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%兵庫%' THEN 28
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%奈良%' THEN 29
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%和歌山%' THEN 30
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%鳥取%' THEN 31
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%島根%' THEN 32
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%岡山%' THEN 33
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%広島%' THEN 34
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%山口%' THEN 35
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%徳島%' THEN 36
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%香川%' THEN 37
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%愛媛%' THEN 38
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%高知%' THEN 39
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%福岡%' THEN 40
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%佐賀%' THEN 41
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%長崎%' THEN 42
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%熊本%' THEN 43
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%大分%' THEN 44
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%宮崎%' THEN 45
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%鹿児島%' THEN 46
+                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%沖縄%' THEN 47
+                        ELSE 99 END) ASC, p.id DESC"""
+                elif sort_order == 'id_asc':
+                    order_clause = "ORDER BY p.id ASC"
+                elif sort_order == 'brewery_asc':
+                    order_clause = "ORDER BY p.brewery_name ASC, p.brand_name ASC"
+                elif sort_order == 'brand_asc' or sort_order == 'name_asc':
+                    order_clause = "ORDER BY p.brand_name ASC"
 
                 # Main Data query with LIMIT & OFFSET
-                data_sql = f"SELECT * FROM products WHERE {where_str} {order_clause} LIMIT ? OFFSET ?"
+                data_sql = f"SELECT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture FROM {from_str} WHERE {where_str} {order_clause} LIMIT ? OFFSET ?"
                 cursor.execute(data_sql, query_args + [limit, offset])
                 products = [dict(r) for r in cursor.fetchall()]
 
