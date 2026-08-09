@@ -1485,9 +1485,18 @@
                 let ratingHtml = '';
                 const ratings = p.ratings || [];
                 const validScores = ratings.map(r => r.total_score).filter(s => s !== undefined && s !== null && s > 0);
+                const commentCount = ratings.length;
+
                 if (validScores.length > 0) {
                     const avg = (validScores.reduce((a, b) => a + b, 0) / validScores.length).toFixed(1);
-                    ratingHtml = `<div class="m-rating">★ ${avg}</div>`;
+                    ratingHtml = `<div class="m-rating" style="display:flex; align-items:center; gap:0.4rem; justify-content:flex-end;">
+                        <span>★ ${avg}</span>
+                        <span style="font-size:0.68rem; color:#64748b; font-weight:600;">(💬 ${commentCount}件)</span>
+                    </div>`;
+                } else if (commentCount > 0) {
+                    ratingHtml = `<div style="font-size:0.7rem; color:#2563eb; font-weight:700; text-align:right; margin-bottom:0.2rem;">💬 コメント ${commentCount}件</div>`;
+                } else {
+                    ratingHtml = `<div style="font-size:0.68rem; color:#94a3b8; text-align:right; margin-bottom:0.2rem;">💬 コメント 0件</div>`;
                 }
 
                 let badgesHtml = '';
