@@ -1538,17 +1538,44 @@
                 img.src = adminSelectedPhotoData;
             });
 
+            function compressPhotoData(base64Str, maxWidth, maxHeight, quality, callback) {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > maxWidth || h > maxHeight) {
+                        if (w > h) {
+                            h = Math.round((h * maxWidth) / w);
+                            w = maxWidth;
+                        } else {
+                            w = Math.round((w * maxHeight) / h);
+                            h = maxHeight;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    callback(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = () => callback(base64Str);
+                img.src = base64Str;
+            }
+
             function handleAdminPhotoSelect(inputEl) {
                 inputEl.addEventListener('change', () => {
                     const file = inputEl.files[0];
                     if (file) {
                         const reader = new FileReader();
                         reader.onload = (e) => {
-                            adminSelectedPhotoData = e.target.result;
-                            adminPhotoPreview.src = adminSelectedPhotoData;
-                            adminPhotoPreview.style.display = 'block';
-                            adminPhotoPlaceholder.style.display = 'none';
-                            adminRotateContainer.style.display = 'block';
+                            compressPhotoData(e.target.result, 1000, 1000, 0.88, (compressedB64) => {
+                                adminSelectedPhotoData = compressedB64;
+                                adminPhotoPreview.src = adminSelectedPhotoData;
+                                adminPhotoPreview.style.display = 'block';
+                                adminPhotoPlaceholder.style.display = 'none';
+                                adminRotateContainer.style.display = 'block';
+                            });
                         };
                         reader.readAsDataURL(file);
                     }
