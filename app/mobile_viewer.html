@@ -1794,6 +1794,23 @@
             }
         }
 
+        function formatFullBrandName(brandName, specName) {
+            const brand = (brandName || '').trim();
+            let spec = (specName || '').trim();
+
+            if (!brand) return spec || '名称不明';
+            if (!spec) return brand;
+
+            if (brand.toLowerCase() === spec.toLowerCase()) return brand;
+
+            if (spec.toLowerCase().startsWith(brand.toLowerCase())) {
+                spec = spec.substring(brand.length).trim();
+            }
+
+            if (!spec) return brand;
+            return `${brand} ${spec}`;
+        }
+
         function renderItems(items, isRec = false) {
             items.forEach(p => {
                 const card = document.createElement('div');
@@ -1835,6 +1852,14 @@
                     reasonHtml = `<div style="font-size:0.65rem; color:var(--success); margin-top:6px;">✨ ${p.rec_reason}</div>`;
                 }
 
+                const brandStr = p.brand_name || p.name || '名称不明';
+                let specStr = (p.spec_name || '').trim();
+                if (specStr.toLowerCase() === brandStr.toLowerCase()) {
+                    specStr = '';
+                } else if (specStr.toLowerCase().startsWith(brandStr.toLowerCase())) {
+                    specStr = specStr.substring(brandStr.length).trim();
+                }
+
                 card.innerHTML = `
                     <div class="m-img-container">
                         ${imgHtml}
@@ -1842,8 +1867,8 @@
                     <div class="m-info">
                         ${ratingHtml}
                         <div class="m-brewery">${p.brewery_name || p.brewery || '不明'}</div>
-                        <div class="m-brand">${p.brand_name || p.name || '名称不明'}</div>
-                        <div class="m-spec">${p.spec_name || ''}</div>
+                        <div class="m-brand">${brandStr}</div>
+                        <div class="m-spec">${specStr}</div>
                         <div class="m-badges">${badgesHtml}</div>
                         ${reasonHtml}
                     </div>
@@ -1877,7 +1902,7 @@
 
             const prefText = (p.display_prefecture || p.prefecture) ? ` (${p.display_prefecture || p.prefecture})` : '';
             document.getElementById('modalBrewery').textContent = (p.brewery_name || p.brewery || '酒蔵情報なし') + prefText;
-            document.getElementById('modalBrand').textContent = (p.brand_name || p.name) + ' ' + (p.spec_name || '');
+            document.getElementById('modalBrand').textContent = formatFullBrandName(p.brand_name || p.name, p.spec_name);
             
             document.getElementById('modalCategory').textContent = p.category || p.sake_type || '非公開';
             document.getElementById('modalPolish').textContent = p.polish_ratio || '非公開';
