@@ -1013,6 +1013,10 @@
                     <span class="spec-label">原料米</span>
                     <span class="spec-value" id="modalRice">-</span>
                 </div>
+                <div class="spec-item" style="grid-column: span 2;">
+                    <span class="spec-label">使用酵母</span>
+                    <span class="spec-value" id="modalYeast" style="color: #2563eb; font-weight: 700;">-</span>
+                </div>
             </div>
             
             <div class="spec-item" style="margin-bottom: 1.5rem;">
@@ -1906,8 +1910,9 @@
             
             document.getElementById('modalCategory').textContent = p.category || p.sake_type || '非公開';
             document.getElementById('modalPolish').textContent = p.polish_ratio || '非公開';
-            document.getElementById('modalAlcohol').textContent = p.alcohol ? p.alcohol + '度' : '非公開';
+            document.getElementById('modalAlcohol').textContent = p.alcohol ? (p.alcohol.includes('度') ? p.alcohol : p.alcohol + '度') : '非公開';
             document.getElementById('modalRice').textContent = p.rice_variety || '非公開';
+            document.getElementById('modalYeast').textContent = p.yeast || '非公開';
             document.getElementById('modalSsi').textContent = p.ssi_type || '-';
 
             // みんなの口コミの描画
