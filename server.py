@@ -70,6 +70,59 @@ def save_base64_image(base64_str, prefix="img"):
         print(f"画像保存エラー: {e}")
         return base64_str
 
+def process_admin_bottle_image(base64_str, product_id):
+    """
+    Decodes base64 image, centers bottle onto 800x800 1:1 white canvas (with AI background removal if rembg available),
+    and saves to cropped_images/admin_uploads/prod_{product_id}_{timestamp}.jpg
+    """
+    if not base64_str: return None
+    import base64, io, time
+    from PIL import Image
+
+    try:
+        if ',' in base64_str:
+            header, encoded = base64_str.split(',', 1)
+        else:
+            encoded = base64_str
+        img_bytes = base64.b64decode(encoded)
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+    except Exception as e:
+        print(f"Image decode error: {e}")
+        return None
+
+    # AI background removal if rembg is installed
+    try:
+        from rembg import remove
+        img = remove(img)
+    except Exception:
+        pass
+
+    # Create 800x800 crisp white 1:1 canvas
+    canvas_size = (800, 800)
+    bg = Image.new("RGBA", canvas_size, (255, 255, 255, 255))
+
+    # Resize bottle image to fit within 720x720 inside canvas
+    img.thumbnail((720, 720), Image.Resampling.LANCZOS)
+
+    # Center bottle
+    x = (canvas_size[0] - img.width) // 2
+    y = (canvas_size[1] - img.height) // 2
+
+    if img.mode == 'RGBA':
+        bg.paste(img, (x, y), img)
+    else:
+        bg.paste(img, (x, y))
+
+    final_img = bg.convert("RGB")
+    admin_upload_dir = os.path.join(BASE_DIR, "cropped_images", "admin_uploads")
+    os.makedirs(admin_upload_dir, exist_ok=True)
+
+    filename = f"prod_{product_id}_{int(time.time())}.jpg"
+    filepath = os.path.join(admin_upload_dir, filename)
+    final_img.save(filepath, "JPEG", quality=90)
+
+    return f"/cropped_images/admin_uploads/{filename}"
+
 import urllib.parse
 import urllib.request
 import re
@@ -1007,6 +1060,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 
                 if user:
                     u_dict = dict(user)
+                    u_dict['is_admin'] = (user['role'] in ('system_admin', 'admin', 'brewery_admin'))
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json; charset=utf-8')
                     self.send_header('Access-Control-Allow-Origin', '*')
@@ -1023,6 +1077,50 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+            return
+
+        elif self.path == "/api/admin/update_product_image":
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            conn = None
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+                product_id = data.get('product_id')
+                image_data = data.get('image_data')
+
+                if not product_id or not image_data:
+                    self.send_response(400)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "product_id と image_data が必要です"}).encode('utf-8'))
+                    return
+
+                saved_path = process_admin_bottle_image(image_data, product_id)
+                if not saved_path:
+                    self.send_response(400)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "画像処理に失敗しました"}).encode('utf-8'))
+                    return
+
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("UPDATE products SET cropped_image_path_front = ? WHERE id = ?", (saved_path, product_id))
+                conn.commit()
+
+                invalidate_server_cache()
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "success", "image_path": saved_path, "message": "公式ボトル写真を更新しました！"}, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                print(f"Admin product image update error: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
+            finally:
+                if conn: conn.close()
             return
 
         elif self.path == "/api/brewery_admin/info/save":

@@ -975,6 +975,19 @@
         <div class="modal-img-wrapper">
             <img id="modalImg" src="" alt="">
         </div>
+
+        <!-- 管理者専用：公式ボトル写真更新エリア -->
+        <div id="adminProductImageSection" style="display: none; margin: 0.8rem 1rem; padding: 0.8rem; background: #fff7ed; border: 1.5px dashed #fdba74; border-radius: 14px;">
+            <div style="font-size: 0.82rem; font-weight: 800; color: #c2410c; margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between;">
+                <span>👑 管理者メニュー</span>
+                <span style="font-size: 0.7rem; color: #ea580c; background: #ffedd5; padding: 2px 6px; border-radius: 4px; font-weight: 700;">公式ボトル画像</span>
+            </div>
+            <button type="button" id="adminUploadImgBtn" style="width: 100%; padding: 0.75rem; background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);">
+                <span style="font-size: 1.2rem;">📸</span>
+                <span>公式ボトル写真を撮影・全体更新する</span>
+            </button>
+        </div>
+
         <div class="modal-content">
             <div class="modal-brewery" id="modalBrewery"></div>
             <div class="modal-brand" id="modalBrand"></div>
@@ -1119,6 +1132,49 @@
         </div>
     </div>
 
+    <!-- 管理者用ボトル写真撮影・トリミングモーダル -->
+    <div class="login-overlay" id="adminPhotoModal" style="display: none; align-items: center; justify-content: center; z-index: 1100;">
+        <div style="background: white; border-radius: 20px; width: 90%; max-width: 400px; padding: 1.2rem; box-shadow: 0 20px 40px rgba(0,0,0,0.3); position: relative;">
+            <button id="closeAdminPhotoModal" style="position: absolute; top: 12px; right: 14px; background: #f1f5f9; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 16px; font-weight: bold; cursor: pointer; color: #64748b;">✕</button>
+            <div style="font-size: 1rem; font-weight: 800; color: #0f172a; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.4rem;">
+                <span>📸 公式ボトル写真の撮影・選択</span>
+            </div>
+
+            <!-- 非表示のinput -->
+            <input type="file" id="adminCamInput" accept="image/*" capture="environment" style="display: none;">
+            <input type="file" id="adminAlbumInput" accept="image/*" style="display: none;">
+
+            <!-- カメラ・アルバム選択ボタン -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.8rem;">
+                <button type="button" id="adminCamBtn" class="photo-select-btn" style="background: #fff7ed; border: 1.5px solid #fed7aa; color: #ea580c;">
+                    <span style="font-size: 1.4rem;">📸</span>
+                    <span>カメラで撮影</span>
+                </button>
+                <button type="button" id="adminAlbumBtn" class="photo-select-btn" style="background: #eff6ff; border: 1.5px solid #bfdbfe; color: #2563eb;">
+                    <span style="font-size: 1.4rem;">🖼️</span>
+                    <span>アルバムから選択</span>
+                </button>
+            </div>
+
+            <!-- プレビュー枠 -->
+            <div style="width: 100%; height: 240px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 14px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 1rem; position: relative;">
+                <img id="adminPhotoPreview" src="" alt="プレビュー" style="display: none; max-width: 100%; max-height: 100%; object-fit: contain;">
+                <div id="adminPhotoPlaceholder" style="text-align: center; color: #94a3b8; font-size: 0.8rem; font-weight: 600;">
+                    <div style="font-size: 2rem; margin-bottom: 0.3rem;">🍶</div>
+                    撮影またはアルバムから写真を選択してください
+                </div>
+            </div>
+
+            <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 1rem; line-height: 1.4; background: #f1f5f9; padding: 0.6rem 0.8rem; border-radius: 8px;">
+                💡 <b>保存時の処理:</b> 撮影されたボトル写真は正方形（1:1）に位置調整・背景最適化され、一般ユーザーの検索一覧に商品画像として即座に反映されます。
+            </div>
+
+            <button type="button" id="saveAdminPhotoBtn" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); color: white; font-weight: 800; font-size: 0.85rem; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);">
+                💾 保存して全ユーザーの一覧に反映する
+            </button>
+        </div>
+    </div>
+
     <script>
         let currentPage = 1;
         let isFetching = false;
@@ -1131,6 +1187,8 @@
         let currentUser = null;
         let currentMode = 'home'; // 'home' or 'rec'
         let attachedImages = [];
+        let currentDetailProduct = null;
+        let adminSelectedPhotoData = null;
 
         const sakeListEl = document.getElementById('sakeList');
         const loadingEl = document.getElementById('loadingIndicator');
@@ -1416,6 +1474,89 @@
                     alert('通信エラー');
                 }
             });
+
+            // 管理者用公式ボトル写真更新イベント制御
+            const adminUploadImgBtn = document.getElementById('adminUploadImgBtn');
+            const adminPhotoModal = document.getElementById('adminPhotoModal');
+            const closeAdminPhotoModal = document.getElementById('closeAdminPhotoModal');
+            const adminCamBtn = document.getElementById('adminCamBtn');
+            const adminAlbumBtn = document.getElementById('adminAlbumBtn');
+            const adminCamInput = document.getElementById('adminCamInput');
+            const adminAlbumInput = document.getElementById('adminAlbumInput');
+            const adminPhotoPreview = document.getElementById('adminPhotoPreview');
+            const adminPhotoPlaceholder = document.getElementById('adminPhotoPlaceholder');
+            const saveAdminPhotoBtn = document.getElementById('saveAdminPhotoBtn');
+
+            adminUploadImgBtn.addEventListener('click', () => {
+                adminSelectedPhotoData = null;
+                adminPhotoPreview.src = '';
+                adminPhotoPreview.style.display = 'none';
+                adminPhotoPlaceholder.style.display = 'block';
+                adminPhotoModal.style.display = 'flex';
+            });
+
+            closeAdminPhotoModal.addEventListener('click', () => {
+                adminPhotoModal.style.display = 'none';
+            });
+
+            adminCamBtn.addEventListener('click', () => adminCamInput.click());
+            adminAlbumBtn.addEventListener('click', () => adminAlbumInput.click());
+
+            function handleAdminPhotoSelect(inputEl) {
+                inputEl.addEventListener('change', () => {
+                    const file = inputEl.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            adminSelectedPhotoData = e.target.result;
+                            adminPhotoPreview.src = adminSelectedPhotoData;
+                            adminPhotoPreview.style.display = 'block';
+                            adminPhotoPlaceholder.style.display = 'none';
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                    inputEl.value = '';
+                });
+            }
+            handleAdminPhotoSelect(adminCamInput);
+            handleAdminPhotoSelect(adminAlbumInput);
+
+            saveAdminPhotoBtn.addEventListener('click', async () => {
+                if (!adminSelectedPhotoData || !currentDetailProduct) {
+                    alert('撮影またはアルバムから写真を選択してください');
+                    return;
+                }
+                try {
+                    saveAdminPhotoBtn.disabled = true;
+                    saveAdminPhotoBtn.textContent = '⏳ 画像処理中・全体反映中...';
+
+                    const res = await fetch('/api/admin/update_product_image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            product_id: currentDetailProduct.id,
+                            image_data: adminSelectedPhotoData
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        alert('公式ボトル写真を更新し、全ユーザーに反映しました！');
+                        currentDetailProduct.cropped_image_path_front = data.image_path;
+                        document.getElementById('modalImg').src = data.image_path;
+                        document.getElementById('modalImg').style.display = 'block';
+                        adminPhotoModal.style.display = 'none';
+                        loadProducts(true);
+                    } else {
+                        alert(data.message || 'エラーが発生しました');
+                    }
+                } catch(e) {
+                    console.error(e);
+                    alert('通信エラー');
+                } finally {
+                    saveAdminPhotoBtn.disabled = false;
+                    saveAdminPhotoBtn.textContent = '💾 保存して全ユーザーの一覧に反映する';
+                }
+            });
         }
 
         function updateChipUI(activeType) {
@@ -1442,10 +1583,17 @@
 
         function updateLoginUI() {
             if (currentUser) {
-                loginBtnText.textContent = currentUser.display_name || currentUser.user_name;
-                loginBtn.style.background = '#ecfdf5';
-                loginBtn.style.color = 'var(--success)';
-                loginBtn.style.borderColor = '#a7f3d0';
+                if (currentUser.is_admin || currentUser.role === 'system_admin' || currentUser.role === 'admin' || currentUser.role === 'brewery_admin') {
+                    loginBtnText.textContent = '👑 ' + (currentUser.display_name || currentUser.user_name);
+                    loginBtn.style.background = '#fff7ed';
+                    loginBtn.style.color = '#c2410c';
+                    loginBtn.style.borderColor = '#ffedd5';
+                } else {
+                    loginBtnText.textContent = currentUser.display_name || currentUser.user_name;
+                    loginBtn.style.background = '#ecfdf5';
+                    loginBtn.style.color = 'var(--success)';
+                    loginBtn.style.borderColor = '#a7f3d0';
+                }
             } else {
                 loginBtnText.textContent = 'ログイン';
                 loginBtn.style.background = '#fff0f1';
@@ -1689,6 +1837,7 @@
         }
 
         function showDetail(p) {
+            currentDetailProduct = p;
             document.getElementById('modalHeaderTitle').textContent = p.brand_name || p.name;
             const imgPath = p.cropped_image_path_front ? p.cropped_image_path_front : '';
             const imgEl = document.getElementById('modalImg');
@@ -1698,6 +1847,14 @@
                 imgEl.style.display = 'block';
             } else {
                 imgEl.style.display = 'none';
+            }
+
+            // 管理者メニュー表示切り替え
+            const adminSection = document.getElementById('adminProductImageSection');
+            if (currentUser && (currentUser.is_admin || currentUser.role === 'system_admin' || currentUser.role === 'admin' || currentUser.role === 'brewery_admin')) {
+                adminSection.style.display = 'block';
+            } else {
+                adminSection.style.display = 'none';
             }
 
             const prefText = (p.display_prefecture || p.prefecture) ? ` (${p.display_prefecture || p.prefecture})` : '';
