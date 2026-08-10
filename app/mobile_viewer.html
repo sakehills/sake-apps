@@ -1180,13 +1180,18 @@
                 </button>
             </div>
 
-            <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 1rem; line-height: 1.4; background: #f1f5f9; padding: 0.6rem 0.8rem; border-radius: 8px;">
-                💡 <b>保存時の処理:</b> 撮影されたボトル写真は正方形（1:1）に位置調整・背景最適化され、一般ユーザーの検索一覧に商品画像として即座に反映されます。
+            <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 0.8rem; line-height: 1.4; background: #f1f5f9; padding: 0.6rem 0.8rem; border-radius: 8px;">
+                💡 <b>保存モード:</b>「自動切り抜き」で背景カットを試すか、「そのまま保存」で撮影写真をそのまま公式写真として全体反映できます。
             </div>
 
-            <button type="button" id="saveAdminPhotoBtn" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); color: white; font-weight: 800; font-size: 0.85rem; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);">
-                💾 保存して全ユーザーの一覧に反映する
-            </button>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <button type="button" id="saveAdminPhotoAutoBtn" style="width: 100%; padding: 0.85rem; background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); color: white; font-weight: 800; font-size: 0.85rem; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.25);">
+                    ✂️ AI自動切り抜きして保存
+                </button>
+                <button type="button" id="saveAdminPhotoRawBtn" style="width: 100%; padding: 0.75rem; background: #f1f5f9; color: #334155; font-weight: 700; font-size: 0.82rem; border: 1.5px solid #cbd5e1; border-radius: 12px; cursor: pointer;">
+                    📸 そのまま保存 (切り抜きなし)
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1537,6 +1542,54 @@
                 };
                 img.src = adminSelectedPhotoData;
             });
+
+            const saveAdminPhotoAutoBtn = document.getElementById('saveAdminPhotoAutoBtn');
+            const saveAdminPhotoRawBtn = document.getElementById('saveAdminPhotoRawBtn');
+
+            async function submitAdminPhoto(autoCrop) {
+                if (!adminSelectedPhotoData || !currentDetailProduct) {
+                    alert('撮影またはアルバムから写真を選択してください');
+                    return;
+                }
+                const targetBtn = autoCrop ? saveAdminPhotoAutoBtn : saveAdminPhotoRawBtn;
+                const origText = targetBtn.textContent;
+                try {
+                    saveAdminPhotoAutoBtn.disabled = true;
+                    saveAdminPhotoRawBtn.disabled = true;
+                    targetBtn.textContent = '⏳ 保存・全体反映中...';
+
+                    const res = await fetch('/api/admin/update_product_image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            product_id: currentDetailProduct.id,
+                            image_data: adminSelectedPhotoData,
+                            auto_crop: autoCrop
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        alert('公式ボトル写真を更新し、全ユーザーに反映しました！');
+                        currentDetailProduct.cropped_image_path_front = data.image_path;
+                        document.getElementById('modalImg').src = data.image_path;
+                        document.getElementById('modalImg').style.display = 'block';
+                        adminPhotoModal.style.display = 'none';
+                        loadProducts(true);
+                    } else {
+                        alert(data.message || 'エラーが発生しました');
+                    }
+                } catch(e) {
+                    console.error(e);
+                    alert('通信エラー');
+                } finally {
+                    saveAdminPhotoAutoBtn.disabled = false;
+                    saveAdminPhotoRawBtn.disabled = false;
+                    targetBtn.textContent = origText;
+                }
+            }
+
+            saveAdminPhotoAutoBtn.addEventListener('click', () => submitAdminPhoto(true));
+            saveAdminPhotoRawBtn.addEventListener('click', () => submitAdminPhoto(false));
 
             function compressPhotoData(base64Str, maxWidth, maxHeight, quality, callback) {
                 const img = new Image();
