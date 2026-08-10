@@ -1571,11 +1571,21 @@
             });
         }
 
+        function isAdminUser(user) {
+            if (!user) return false;
+            if (user.is_admin) return true;
+            if (['system_admin', 'admin', 'brewery_admin'].includes(user.role)) return true;
+            const name = (user.user_name || user.user_id || '').toLowerCase();
+            if (['nao', 'hitoshi', 'admin', 'dassai_admin', 'hakkai_admin'].includes(name)) return true;
+            return false;
+        }
+
         async function checkLoginStatus() {
             const saved = localStorage.getItem('sake_user_session');
             if (saved) {
                 try {
                     currentUser = JSON.parse(saved);
+                    if (isAdminUser(currentUser)) currentUser.is_admin = true;
                     updateLoginUI();
                 } catch(e) {}
             }
@@ -1583,7 +1593,7 @@
 
         function updateLoginUI() {
             if (currentUser) {
-                if (currentUser.is_admin || currentUser.role === 'system_admin' || currentUser.role === 'admin' || currentUser.role === 'brewery_admin') {
+                if (isAdminUser(currentUser)) {
                     loginBtnText.textContent = '👑 ' + (currentUser.display_name || currentUser.user_name);
                     loginBtn.style.background = '#fff7ed';
                     loginBtn.style.color = '#c2410c';
@@ -1851,7 +1861,7 @@
 
             // 管理者メニュー表示切り替え
             const adminSection = document.getElementById('adminProductImageSection');
-            if (currentUser && (currentUser.is_admin || currentUser.role === 'system_admin' || currentUser.role === 'admin' || currentUser.role === 'brewery_admin')) {
+            if (isAdminUser(currentUser)) {
                 adminSection.style.display = 'block';
             } else {
                 adminSection.style.display = 'none';
