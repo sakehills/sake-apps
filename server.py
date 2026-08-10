@@ -72,12 +72,12 @@ def save_base64_image(base64_str, prefix="img"):
 
 def process_admin_bottle_image(base64_str, product_id):
     """
-    Decodes base64 image, centers bottle onto 800x800 1:1 white canvas (with AI background removal if rembg available),
-    and saves to cropped_images/admin_uploads/prod_{product_id}_{timestamp}.jpg
+    Decodes base64 image, fixes EXIF rotation, performs background removal & vertical bottle auto-cropping,
+    and places bottle onto an 800x800 white 1:1 canvas.
     """
     if not base64_str: return None
     import base64, io, time
-    from PIL import Image
+    from PIL import Image, ImageOps
 
     try:
         if ',' in base64_str:
@@ -85,19 +85,70 @@ def process_admin_bottle_image(base64_str, product_id):
         else:
             encoded = base64_str
         img_bytes = base64.b64decode(encoded)
-        img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        img = Image.open(io.BytesIO(img_bytes))
+        # EXIF rotation fix (fixes iPhone photo orientation!)
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGBA")
     except Exception as e:
         print(f"Image decode error: {e}")
         return None
 
-    # AI background removal if rembg is installed
+    # Ensure portrait orientation (bottles are vertical)
+    if img.width > img.height:
+        img = img.rotate(270, expand=True)
+
+    # 1. Background removal attempt using rembg
+    rembg_success = False
     try:
         from rembg import remove
-        img = remove(img)
-    except Exception:
-        pass
+        removed = remove(img)
+        bbox = removed.getbbox()
+        if bbox:
+            img = removed.crop(bbox)
+            rembg_success = True
+    except Exception as e:
+        print(f"rembg notice: {e}")
 
-    # Create 800x800 crisp white 1:1 canvas
+    # 2. If rembg not available, perform OpenCV GrabCut background cleaning & bottle bounding crop
+    if not rembg_success:
+        try:
+            import cv2
+            import numpy as np
+
+            img_np = np.array(img.convert('RGB'))
+            h, w, _ = img_np.shape
+            
+            # Run GrabCut around middle 92% area
+            mask = np.zeros((h, w), np.uint8)
+            bgdModel = np.zeros((1, 65), np.float64)
+            fgdModel = np.zeros((1, 65), np.float64)
+            rect = (int(w * 0.04), int(h * 0.04), int(w * 0.92), int(h * 0.92))
+            cv2.grabCut(img_np, mask, rect, bgdModel, fgdModel, 4, cv2.GC_INIT_WITH_RECT)
+            mask2 = np.where((mask == 2) | (mask == 0), 0, 1).astype('uint8')
+            
+            # Find bottle bounding rectangle
+            contours, _ = cv2.findContours(mask2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                c = max(contours, key=cv2.contourArea)
+                x, y, bw, bh = cv2.boundingRect(c)
+                if bw > w * 0.15 and bh > h * 0.15:
+                    img_rgba_np = np.array(img)
+                    img_rgba_np[:, :, 3] = mask2 * 255
+                    cropped_np = img_rgba_np[y:y+bh, x:x+bw]
+                    img = Image.fromarray(cropped_np)
+        except Exception as cv_err:
+            print(f"OpenCV background cleanup notice: {cv_err}")
+
+    # Final check: tight bbox crop
+    bbox = img.getbbox()
+    if bbox:
+        img = img.crop(bbox)
+
+    # Re-check orientation after crop (must be vertical bottle!)
+    if img.width > img.height:
+        img = img.rotate(270, expand=True)
+
+    # Paste centered onto 800x800 crisp white 1:1 canvas
     canvas_size = (800, 800)
     bg = Image.new("RGBA", canvas_size, (255, 255, 255, 255))
 

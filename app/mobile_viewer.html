@@ -1165,12 +1165,19 @@
             </div>
 
             <!-- プレビュー枠 -->
-            <div style="width: 100%; height: 240px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 14px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 1rem; position: relative;">
+            <div style="width: 100%; height: 240px; background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 14px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 0.6rem; position: relative;">
                 <img id="adminPhotoPreview" src="" alt="プレビュー" style="display: none; max-width: 100%; max-height: 100%; object-fit: contain;">
                 <div id="adminPhotoPlaceholder" style="text-align: center; color: #94a3b8; font-size: 0.8rem; font-weight: 600;">
                     <div style="font-size: 2rem; margin-bottom: 0.3rem;">🍶</div>
                     撮影またはアルバムから写真を選択してください
                 </div>
+            </div>
+
+            <!-- 回転ボタン -->
+            <div id="adminRotateContainer" style="display: none; text-align: center; margin-bottom: 0.8rem;">
+                <button type="button" id="adminRotateBtn" style="padding: 0.45rem 1rem; background: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 20px; font-size: 0.78rem; font-weight: 700; color: #334155; cursor: pointer; display: inline-flex; align-items: center; gap: 0.3rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    🔄 写真を90°回転する
+                </button>
             </div>
 
             <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 1rem; line-height: 1.4; background: #f1f5f9; padding: 0.6rem 0.8rem; border-radius: 8px;">
@@ -1495,11 +1502,15 @@
             const adminPhotoPlaceholder = document.getElementById('adminPhotoPlaceholder');
             const saveAdminPhotoBtn = document.getElementById('saveAdminPhotoBtn');
 
+            const adminRotateBtn = document.getElementById('adminRotateBtn');
+            const adminRotateContainer = document.getElementById('adminRotateContainer');
+
             adminUploadImgBtn.addEventListener('click', () => {
                 adminSelectedPhotoData = null;
                 adminPhotoPreview.src = '';
                 adminPhotoPreview.style.display = 'none';
                 adminPhotoPlaceholder.style.display = 'block';
+                adminRotateContainer.style.display = 'none';
                 adminPhotoModal.style.display = 'flex';
             });
 
@@ -1509,6 +1520,23 @@
 
             adminCamBtn.addEventListener('click', () => adminCamInput.click());
             adminAlbumBtn.addEventListener('click', () => adminAlbumInput.click());
+
+            adminRotateBtn.addEventListener('click', () => {
+                if (!adminSelectedPhotoData) return;
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.height;
+                    canvas.height = img.width;
+                    const ctx = canvas.getContext('2d');
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate(90 * Math.PI / 180);
+                    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+                    adminSelectedPhotoData = canvas.toDataURL('image/jpeg', 0.92);
+                    adminPhotoPreview.src = adminSelectedPhotoData;
+                };
+                img.src = adminSelectedPhotoData;
+            });
 
             function handleAdminPhotoSelect(inputEl) {
                 inputEl.addEventListener('change', () => {
@@ -1520,6 +1548,7 @@
                             adminPhotoPreview.src = adminSelectedPhotoData;
                             adminPhotoPreview.style.display = 'block';
                             adminPhotoPlaceholder.style.display = 'none';
+                            adminRotateContainer.style.display = 'block';
                         };
                         reader.readAsDataURL(file);
                     }
