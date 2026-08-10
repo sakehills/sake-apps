@@ -474,6 +474,54 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.02) !important;
         }
 
+        .photo-select-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            padding: 0.75rem 0.5rem;
+            border-radius: 14px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .photo-select-btn:active {
+            transform: scale(0.96);
+        }
+        .photo-thumb-card {
+            position: relative;
+            width: 75px;
+            height: 75px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1.5px solid #cbd5e1;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .photo-thumb-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .photo-thumb-del {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(15, 23, 42, 0.8);
+            color: #ffffff;
+            border: none;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
         /* ログインモーダル */
         .login-overlay {
             position: fixed;
@@ -1022,17 +1070,32 @@
                     <textarea id="rateComment" style="width: 100%; height: 80px; padding: 0.5rem; background: rgba(11,15,25,0.6); color: white; border: 1px solid var(--border-color); border-radius: 8px; resize: none;" placeholder="味わいの感想を記入..."></textarea>
                 </div>
                 
-                <div style="margin-bottom: 1rem;">
-                    <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">写真の添付 (最大2枚)</label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
-                        <div>
-                            <input type="file" id="rateImageInput1" accept="image/*" style="font-size: 0.8rem; width: 100%;">
-                            <img id="rateImagePreview1" style="display:none; width:100%; margin-top:0.4rem; border-radius:8px;">
-                        </div>
-                        <div>
-                            <input type="file" id="rateImageInput2" accept="image/*" style="font-size: 0.8rem; width: 100%;">
-                            <img id="rateImagePreview2" style="display:none; width:100%; margin-top:0.4rem; border-radius:8px;">
-                        </div>
+                <!-- 写真添付エリア (カメラ ＆ アルバム選択) -->
+                <div style="margin-bottom: 1.2rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <label style="font-size: 0.85rem; font-weight: 700; color: #475569;">📷 写真を追加 (最大2枚)</label>
+                        <span style="font-size: 0.75rem; color: #64748b; font-weight: 700;" id="photoCountLabel">0 / 2枚</span>
+                    </div>
+
+                    <!-- 非表示のinput要素 -->
+                    <input type="file" id="camInput" accept="image/*" capture="environment" style="display: none;">
+                    <input type="file" id="albumInput" accept="image/*" style="display: none;">
+
+                    <!-- カメラ ＆ アルバム 選択ボタンカード -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.8rem;">
+                        <button type="button" id="camBtn" class="photo-select-btn" style="background: #fff0f1; border: 1.5px solid #ffccd0; color: #ff4757;">
+                            <span style="font-size: 1.4rem;">📸</span>
+                            <span>カメラで撮影</span>
+                        </button>
+                        <button type="button" id="albumBtn" class="photo-select-btn" style="background: #eff6ff; border: 1.5px solid #bfdbfe; color: #2563eb;">
+                            <span style="font-size: 1.4rem;">🖼️</span>
+                            <span>アルバムから選択</span>
+                        </button>
+                    </div>
+
+                    <!-- プレビュー表示エリア -->
+                    <div id="photoPreviewContainer" style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+                        <!-- サムネイルカード + 削除ボタン -->
                     </div>
                 </div>
 
@@ -1067,6 +1130,7 @@
         let currentSort = 'id_desc';
         let currentUser = null;
         let currentMode = 'home'; // 'home' or 'rec'
+        let attachedImages = [];
 
         const sakeListEl = document.getElementById('sakeList');
         const loadingEl = document.getElementById('loadingIndicator');
@@ -1245,27 +1309,72 @@
                 });
             });
 
-            // 画像プレビュー関数
-            function setupImageInput(inputId, previewId) {
-                const input = document.getElementById(inputId);
-                const preview = document.getElementById(previewId);
-                input.addEventListener('change', () => {
-                    const file = input.files[0];
+            // 写真選択（カメラ ＆ アルバム）の制御
+            const camInput = document.getElementById('camInput');
+            const albumInput = document.getElementById('albumInput');
+            const camBtn = document.getElementById('camBtn');
+            const albumBtn = document.getElementById('albumBtn');
+
+            camBtn.addEventListener('click', () => {
+                if (attachedImages.length >= 2) {
+                    alert('写真は最大2枚まで添付できます');
+                    return;
+                }
+                camInput.click();
+            });
+
+            albumBtn.addEventListener('click', () => {
+                if (attachedImages.length >= 2) {
+                    alert('写真は最大2枚まで添付できます');
+                    return;
+                }
+                albumInput.click();
+            });
+
+            function setupPhotoInput(inputEl) {
+                inputEl.addEventListener('change', () => {
+                    const file = inputEl.files[0];
                     if (file) {
+                        if (attachedImages.length >= 2) {
+                            alert('写真は最大2枚まで添付できます');
+                            return;
+                        }
                         const reader = new FileReader();
                         reader.onload = (e) => {
-                            preview.src = e.target.result;
-                            preview.style.display = 'block';
+                            attachedImages.push(e.target.result);
+                            renderPhotoPreviews();
                         };
                         reader.readAsDataURL(file);
-                    } else {
-                        preview.style.display = 'none';
-                        preview.src = '';
                     }
+                    inputEl.value = '';
                 });
             }
-            setupImageInput('rateImageInput1', 'rateImagePreview1');
-            setupImageInput('rateImageInput2', 'rateImagePreview2');
+            setupPhotoInput(camInput);
+            setupPhotoInput(albumInput);
+
+            window.renderPhotoPreviews = function() {
+                const photoPreviewContainer = document.getElementById('photoPreviewContainer');
+                const photoCountLabel = document.getElementById('photoCountLabel');
+                if (!photoPreviewContainer || !photoCountLabel) return;
+
+                photoPreviewContainer.innerHTML = '';
+                photoCountLabel.textContent = `${attachedImages.length} / 2枚`;
+
+                attachedImages.forEach((imgUrl, idx) => {
+                    const card = document.createElement('div');
+                    card.className = 'photo-thumb-card';
+                    card.innerHTML = `
+                        <img src="${imgUrl}" alt="添付写真 ${idx + 1}">
+                        <button type="button" class="photo-thumb-del">✕</button>
+                    `;
+                    card.querySelector('.photo-thumb-del').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        attachedImages.splice(idx, 1);
+                        renderPhotoPreviews();
+                    });
+                    photoPreviewContainer.appendChild(card);
+                });
+            };
 
             // ログイン関連
             loginBtn.addEventListener('click', () => {
@@ -1672,22 +1781,13 @@
                     if (b.dataset.type === targetType) b.classList.add('active');
                 });
                 
-                // Reset image inputs
-                document.getElementById('rateImageInput1').value = '';
-                document.getElementById('rateImagePreview1').style.display = 'none';
-                document.getElementById('rateImagePreview1').src = '';
-                document.getElementById('rateImageInput2').value = '';
-                document.getElementById('rateImagePreview2').style.display = 'none';
-                document.getElementById('rateImagePreview2').src = '';
-                
-                if (myRating && myRating.rating_image) {
-                    document.getElementById('rateImagePreview1').src = myRating.rating_image;
-                    document.getElementById('rateImagePreview1').style.display = 'block';
+                // 添付画像の復元と描画
+                attachedImages = [];
+                if (myRating) {
+                    if (myRating.rating_image) attachedImages.push(myRating.rating_image);
+                    if (myRating.rating_image_2) attachedImages.push(myRating.rating_image_2);
                 }
-                if (myRating && myRating.rating_image_2) {
-                    document.getElementById('rateImagePreview2').src = myRating.rating_image_2;
-                    document.getElementById('rateImagePreview2').style.display = 'block';
-                }
+                if (window.renderPhotoPreviews) window.renderPhotoPreviews();
 
                 // Delete Button Visibility
                 const deleteRateBtn = document.getElementById('deleteRateBtn');
@@ -1741,22 +1841,12 @@
                             ssi_type: ssi,
                             body_level: bLevel,
                             aroma_level: aLevel,
-                            rating_image: document.getElementById('rateImagePreview1').src,
-                            rating_image_2: document.getElementById('rateImagePreview2').src
+                            rating_image: attachedImages[0] || null,
+                            rating_image_2: attachedImages[1] || null
                         };
                         
-                        // srcが空なら削除
-                        if (!document.getElementById('rateImagePreview1').src || document.getElementById('rateImagePreview1').style.display === 'none') {
-                            delete payload.rating_image;
-                        } else if (!payload.rating_image.startsWith('data:image')) {
-                            // URLならそのまま送る
-                        }
-
-                        if (!document.getElementById('rateImagePreview2').src || document.getElementById('rateImagePreview2').style.display === 'none') {
-                            delete payload.rating_image_2;
-                        } else if (!payload.rating_image_2.startsWith('data:image')) {
-                            // URLならそのまま送る
-                        }
+                        if (!payload.rating_image) delete payload.rating_image;
+                        if (!payload.rating_image_2) delete payload.rating_image_2;
 
                         const res = await fetch('/api/rate', {
                             method: 'POST',
@@ -1767,7 +1857,11 @@
                         if (data.status === 'success') {
                             alert('コメントを保存しました');
                             detailModal.classList.remove('show');
-                            loadProducts(true);
+                            if (currentMode === 'my_ratings') {
+                                loadMyRatings();
+                            } else {
+                                loadProducts(true);
+                            }
                         } else {
                             alert(data.message || 'エラーが発生しました');
                         }
