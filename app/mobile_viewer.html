@@ -1884,151 +1884,215 @@
         }
 
         function showDetail(p) {
-            currentDetailProduct = p;
-            document.getElementById('modalHeaderTitle').textContent = p.brand_name || p.name;
-            const imgPath = p.cropped_image_path_front ? p.cropped_image_path_front : '';
-            const imgEl = document.getElementById('modalImg');
-            
-            if (imgPath) {
-                imgEl.src = imgPath;
-                imgEl.style.display = 'block';
-            } else {
-                imgEl.style.display = 'none';
-            }
+            try {
+                currentDetailProduct = p;
+                document.getElementById('modalHeaderTitle').textContent = p.brand_name || p.name || '詳細';
+                const imgPath = p.cropped_image_path_front ? p.cropped_image_path_front : '';
+                const imgEl = document.getElementById('modalImg');
+                
+                if (imgPath) {
+                    imgEl.src = imgPath;
+                    imgEl.style.display = 'block';
+                } else {
+                    imgEl.style.display = 'none';
+                }
 
-            // 管理者メニュー表示切り替え
-            const adminSection = document.getElementById('adminProductImageSection');
-            if (isAdminUser(currentUser)) {
-                adminSection.style.display = 'block';
-            } else {
-                adminSection.style.display = 'none';
-            }
+                // 管理者メニュー表示切り替え
+                const adminSection = document.getElementById('adminProductImageSection');
+                if (isAdminUser(currentUser)) {
+                    adminSection.style.display = 'block';
+                } else {
+                    adminSection.style.display = 'none';
+                }
 
-            const prefText = (p.display_prefecture || p.prefecture) ? ` (${p.display_prefecture || p.prefecture})` : '';
-            document.getElementById('modalBrewery').textContent = (p.brewery_name || p.brewery || '酒蔵情報なし') + prefText;
-            document.getElementById('modalBrand').textContent = formatFullBrandName(p.brand_name || p.name, p.spec_name);
-            
-            document.getElementById('modalCategory').textContent = p.category || p.sake_type || '非公開';
-            document.getElementById('modalPolish').textContent = p.polish_ratio || '非公開';
-            document.getElementById('modalAlcohol').textContent = p.alcohol ? (p.alcohol.includes('度') ? p.alcohol : p.alcohol + '度') : '非公開';
-            document.getElementById('modalRice').textContent = p.rice_variety || '非公開';
-            document.getElementById('modalYeast').textContent = p.yeast || '非公開';
-            document.getElementById('modalSsi').textContent = p.ssi_type || '-';
+                const prefText = (p.display_prefecture || p.prefecture) ? ` (${p.display_prefecture || p.prefecture})` : '';
+                document.getElementById('modalBrewery').textContent = (p.brewery_name || p.brewery || '酒蔵情報なし') + prefText;
+                document.getElementById('modalBrand').textContent = formatFullBrandName(p.brand_name || p.name, p.spec_name);
+                
+                document.getElementById('modalCategory').textContent = p.category || p.sake_type || '非公開';
+                document.getElementById('modalPolish').textContent = p.polish_ratio ? (String(p.polish_ratio).includes('%') ? p.polish_ratio : p.polish_ratio + '%') : '非公開';
+                
+                const alcStr = p.alcohol ? String(p.alcohol) : '';
+                document.getElementById('modalAlcohol').textContent = alcStr ? (alcStr.includes('度') ? alcStr : alcStr + '度') : '非公開';
+                
+                document.getElementById('modalRice').textContent = p.rice_variety || '非公開';
+                document.getElementById('modalYeast').textContent = p.yeast || '非公開';
+                document.getElementById('modalSsi').textContent = p.ssi_type || '-';
 
-            // みんなの口コミの描画
-            const reviewsListEl = document.getElementById('userReviewsList');
-            const reviewsCountEl = document.getElementById('reviewsCount');
-            reviewsListEl.innerHTML = '';
+                // みんなの口コミの描画
+                const reviewsListEl = document.getElementById('userReviewsList');
+                const reviewsCountEl = document.getElementById('reviewsCount');
+                reviewsListEl.innerHTML = '';
 
-            const ratings = p.ratings || [];
-            // 新しい日時順（降順）に並べ替え
-            ratings.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+                const ratings = p.ratings || [];
+                // 新しい日時順（降順）に並べ替え
+                ratings.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
-            reviewsCountEl.textContent = ratings.length;
+                reviewsCountEl.textContent = ratings.length;
 
-            if (ratings.length === 0) {
-                reviewsListEl.innerHTML = '<div style="font-size:0.8rem; color:#94a3b8; padding:0.5rem 0;">まだ口コミがありません。ログインして最初のレビューを投稿してみましょう！</div>';
-            } else {
-                ratings.forEach(r => {
-                    const item = document.createElement('div');
-                    item.style.cssText = 'background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:0.75rem; font-size:0.8rem;';
-                    
-                    const scoreStr = r.total_score ? `★ ${r.total_score.toFixed(1)}` : '評価あり';
-                    
-                    let dateStr = '';
-                    if (r.created_at) {
-                        const d = new Date(r.created_at);
-                        if (!isNaN(d.getTime())) {
-                            const y = d.getFullYear();
-                            const m = String(d.getMonth() + 1).padStart(2, '0');
-                            const day = String(d.getDate()).padStart(2, '0');
-                            const hh = String(d.getHours()).padStart(2, '0');
-                            const mm = String(d.getMinutes()).padStart(2, '0');
-                            dateStr = `📅 ${y}/${m}/${day} ${hh}:${mm}`;
-                        } else {
-                            dateStr = '📅 ' + r.created_at.replace('T', ' ').split('.')[0];
+                if (ratings.length === 0) {
+                    reviewsListEl.innerHTML = '<div style="font-size:0.8rem; color:#94a3b8; padding:0.5rem 0;">まだ口コミがありません。ログインして最初のレビューを投稿してみましょう！</div>';
+                } else {
+                    ratings.forEach(r => {
+                        const item = document.createElement('div');
+                        item.style.cssText = 'background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:0.75rem; font-size:0.8rem;';
+                        
+                        const scoreStr = r.total_score ? `★ ${r.total_score.toFixed(1)}` : '評価あり';
+                        
+                        let dateStr = '';
+                        if (r.created_at) {
+                            const d = new Date(r.created_at);
+                            if (!isNaN(d.getTime())) {
+                                const y = d.getFullYear();
+                                const m = String(d.getMonth() + 1).padStart(2, '0');
+                                const day = String(d.getDate()).padStart(2, '0');
+                                const hh = String(d.getHours()).padStart(2, '0');
+                                const mm = String(d.getMinutes()).padStart(2, '0');
+                                dateStr = `📅 ${y}/${m}/${day} ${hh}:${mm}`;
+                            } else {
+                                dateStr = '📅 ' + r.created_at.replace('T', ' ').split('.')[0];
+                            }
                         }
-                    }
 
-                    const userStr = r.user_name || '匿名ユーザー';
-                    const commentStr = r.comment ? r.comment : '（コメントなし）';
+                        const userStr = r.user_name || '匿名ユーザー';
+                        const commentStr = r.comment ? r.comment : '（コメントなし）';
+                        
+                        let imgsHtml = '';
+                        if (r.rating_image) {
+                            imgsHtml += `<img src="${r.rating_image}" style="width:65px; height:65px; object-fit:cover; border-radius:8px; margin-top:0.4rem; border:1px solid #cbd5e1;">`;
+                        }
+                        if (r.rating_image_2) {
+                            imgsHtml += `<img src="${r.rating_image_2}" style="width:65px; height:65px; object-fit:cover; border-radius:8px; margin-top:0.4rem; margin-left:0.4rem; border:1px solid #cbd5e1;">`;
+                        }
+                        if (imgsHtml) imgsHtml = `<div style="display:flex; gap:0.4rem; flex-wrap:wrap;">${imgsHtml}</div>`;
+
+                        let ssiTag = r.ssi_type ? `<span style="background:#fff0f1; color:#ff4757; padding:2px 6px; border-radius:4px; font-size:0.68rem; font-weight:700; margin-left:0.4rem;">${r.ssi_type}</span>` : '';
+
+                        item.innerHTML = `
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+                                <div style="font-weight:700; color:#1e293b; display:flex; align-items:center;">👤 ${userStr} ${ssiTag}</div>
+                                <div style="color:#ff4757; font-weight:800; font-size:0.85rem;">${scoreStr}</div>
+                            </div>
+                            <div style="color:#334155; line-height:1.4; white-space:pre-wrap; margin-bottom:0.3rem;">${commentStr}</div>
+                            ${imgsHtml}
+                            <div style="font-size:0.68rem; color:#94a3b8; margin-top:0.4rem; text-align:right;">${dateStr}</div>
+                        `;
+                        reviewsListEl.appendChild(item);
+                    });
+                }
+
+                const commentSection = document.getElementById('commentSection');
+                if (currentUser) {
+                    commentSection.style.display = 'block';
                     
-                    let imgsHtml = '';
-                    if (r.rating_image) {
-                        imgsHtml += `<img src="${r.rating_image}" style="width:65px; height:65px; object-fit:cover; border-radius:8px; margin-top:0.4rem; border:1px solid #cbd5e1;">`;
+                    // 既存の自分のコメントを探す
+                    let myRating = null;
+                    if (p.ratings && p.ratings.length > 0) {
+                        myRating = p.ratings.find(r => r.user_name === currentUser.user_name);
                     }
-                    if (r.rating_image_2) {
-                        imgsHtml += `<img src="${r.rating_image_2}" style="width:65px; height:65px; object-fit:cover; border-radius:8px; margin-top:0.4rem; margin-left:0.4rem; border:1px solid #cbd5e1;">`;
+                    
+                    document.getElementById('rateScore').value = myRating && myRating.total_score ? myRating.total_score : "4.0";
+                    document.getElementById('rateScoreVal').textContent = myRating && myRating.total_score ? myRating.total_score.toFixed(1) : "4.0";
+                    document.getElementById('rateTasteScore').value = myRating && myRating.taste_score ? myRating.taste_score : "4.0";
+                    document.getElementById('rateTasteScoreVal').textContent = myRating && myRating.taste_score ? myRating.taste_score.toFixed(1) : "4.0";
+                    document.getElementById('rateAromaScore').value = myRating && myRating.aroma_score ? myRating.aroma_score : "4.0";
+                    document.getElementById('rateAromaScoreVal').textContent = myRating && myRating.aroma_score ? myRating.aroma_score.toFixed(1) : "4.0";
+                    
+                    document.getElementById('rateComment').value = myRating && myRating.comment ? myRating.comment : "";
+                    
+                    const rateBodyEl = document.getElementById('rateBodyLevel');
+                    if (rateBodyEl) rateBodyEl.value = myRating && myRating.body_level ? myRating.body_level : "";
+                    
+                    const rateAromaEl = document.getElementById('rateAromaLevel');
+                    if (rateAromaEl) rateAromaEl.value = myRating && myRating.aroma_level ? myRating.aroma_level : "";
+                    
+                    document.querySelectorAll('#rateSsiGroup .ssi-btn').forEach(b => {
+                        b.classList.remove('active');
+                        const targetType = myRating && myRating.ssi_type ? myRating.ssi_type : p.ssi_type;
+                        if (b.dataset.type === targetType) b.classList.add('active');
+                    });
+                    
+                    // 添付画像の復元と描画
+                    attachedImages = [];
+                    if (myRating) {
+                        if (myRating.rating_image) attachedImages.push(myRating.rating_image);
+                        if (myRating.rating_image_2) attachedImages.push(myRating.rating_image_2);
                     }
-                    if (imgsHtml) imgsHtml = `<div style="display:flex; gap:0.4rem; flex-wrap:wrap;">${imgsHtml}</div>`;
+                    if (window.renderPhotoPreviews) window.renderPhotoPreviews();
 
-                    let ssiTag = r.ssi_type ? `<span style="background:#fff0f1; color:#ff4757; padding:2px 6px; border-radius:4px; font-size:0.68rem; font-weight:700; margin-left:0.4rem;">${r.ssi_type}</span>` : '';
-
-                    item.innerHTML = `
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
-                            <div style="font-weight:700; color:#1e293b; display:flex; align-items:center;">👤 ${userStr} ${ssiTag}</div>
-                            <div style="color:#ff4757; font-weight:800; font-size:0.85rem;">${scoreStr}</div>
-                        </div>
-                        <div style="color:#334155; line-height:1.4; white-space:pre-wrap; margin-bottom:0.3rem;">${commentStr}</div>
-                        ${imgsHtml}
-                        <div style="font-size:0.68rem; color:#94a3b8; margin-top:0.4rem; text-align:right;">${dateStr}</div>
-                    `;
-                    reviewsListEl.appendChild(item);
-                });
-            }
-
-            const commentSection = document.getElementById('commentSection');
-            if (currentUser) {
-                commentSection.style.display = 'block';
-                
-                // 既存の自分のコメントを探す
-                let myRating = null;
-                if (p.ratings && p.ratings.length > 0) {
-                    myRating = p.ratings.find(r => r.user_name === currentUser.user_name);
-                }
-                
-                document.getElementById('rateScore').value = myRating && myRating.total_score ? myRating.total_score : "4.0";
-                document.getElementById('rateScoreVal').textContent = myRating && myRating.total_score ? myRating.total_score.toFixed(1) : "4.0";
-                document.getElementById('rateTasteScore').value = myRating && myRating.taste_score ? myRating.taste_score : "4.0";
-                document.getElementById('rateTasteScoreVal').textContent = myRating && myRating.taste_score ? myRating.taste_score.toFixed(1) : "4.0";
-                document.getElementById('rateAromaScore').value = myRating && myRating.aroma_score ? myRating.aroma_score : "4.0";
-                document.getElementById('rateAromaScoreVal').textContent = myRating && myRating.aroma_score ? myRating.aroma_score.toFixed(1) : "4.0";
-                
-                document.getElementById('rateComment').value = myRating && myRating.comment ? myRating.comment : "";
-                document.getElementById('rateBodyLevel').value = myRating && myRating.body_level ? myRating.body_level : "";
-                document.getElementById('rateAromaLevel').value = myRating && myRating.aroma_level ? myRating.aroma_level : "";
-                
-                document.querySelectorAll('#rateSsiGroup .ssi-btn').forEach(b => {
-                    b.classList.remove('active');
-                    const targetType = myRating && myRating.ssi_type ? myRating.ssi_type : p.ssi_type;
-                    if (b.dataset.type === targetType) b.classList.add('active');
-                });
-                
-                // 添付画像の復元と描画
-                attachedImages = [];
-                if (myRating) {
-                    if (myRating.rating_image) attachedImages.push(myRating.rating_image);
-                    if (myRating.rating_image_2) attachedImages.push(myRating.rating_image_2);
-                }
-                if (window.renderPhotoPreviews) window.renderPhotoPreviews();
-
-                // Delete Button Visibility
-                const deleteRateBtn = document.getElementById('deleteRateBtn');
-                if (myRating) {
-                    deleteRateBtn.style.display = 'block';
-                    deleteRateBtn.onclick = async () => {
-                        if (!confirm('このコメントを削除しますか？')) return;
+                    // Delete Button Visibility
+                    const deleteRateBtn = document.getElementById('deleteRateBtn');
+                    if (myRating) {
+                        deleteRateBtn.style.display = 'block';
+                        deleteRateBtn.onclick = async () => {
+                            if (!confirm('このコメントを削除しますか？')) return;
+                            try {
+                                const res = await fetch('/api/rate/delete', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ product_id: p.id, user_name: currentUser.user_name })
+                                });
+                                const data = await res.json();
+                                if (data.status === 'success') {
+                                    alert('削除しました');
+                                    detailModal.classList.remove('show');
+                                    loadProducts(true);
+                                } else {
+                                    alert(data.message || 'エラーが発生しました');
+                                }
+                            } catch(e) {
+                                alert('通信エラー');
+                            }
+                        };
+                    } else {
+                        deleteRateBtn.style.display = 'none';
+                    }
+                    
+                    document.getElementById('submitRateBtn').onclick = async () => {
+                        const score = parseFloat(document.getElementById('rateScore').value);
+                        const tScore = parseFloat(document.getElementById('rateTasteScore').value);
+                        const aScore = parseFloat(document.getElementById('rateAromaScore').value);
+                        const comment = document.getElementById('rateComment').value;
+                        const bLevel = rateBodyEl ? rateBodyEl.value : '';
+                        const aLevel = rateAromaEl ? rateAromaEl.value : '';
+                        
+                        let ssi = '';
+                        const activeSsi = document.querySelector('#rateSsiGroup .ssi-btn.active');
+                        if (activeSsi) ssi = activeSsi.dataset.type;
+                        
                         try {
-                            const res = await fetch('/api/rate/delete', {
+                            const payload = {
+                                product_id: p.id,
+                                total_score: score,
+                                taste_score: tScore,
+                                aroma_score: aScore,
+                                comment: comment,
+                                user_name: currentUser.user_name,
+                                user_id: currentUser.user_id,
+                                ssi_type: ssi,
+                                body_level: bLevel,
+                                aroma_level: aLevel,
+                                rating_image: attachedImages[0] || null,
+                                rating_image_2: attachedImages[1] || null
+                            };
+                            
+                            if (!payload.rating_image) delete payload.rating_image;
+                            if (!payload.rating_image_2) delete payload.rating_image_2;
+
+                            const res = await fetch('/api/rate', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ product_id: p.id, user_name: currentUser.user_name })
+                                body: JSON.stringify(payload)
                             });
                             const data = await res.json();
                             if (data.status === 'success') {
-                                alert('削除しました');
+                                alert('コメントを保存しました');
                                 detailModal.classList.remove('show');
-                                loadProducts(true);
+                                if (currentMode === 'my_ratings') {
+                                    loadMyRatings();
+                                } else {
+                                    loadProducts(true);
+                                }
                             } else {
                                 alert(data.message || 'エラーが発生しました');
                             }
@@ -2037,66 +2101,13 @@
                         }
                     };
                 } else {
-                    deleteRateBtn.style.display = 'none';
+                    commentSection.style.display = 'none';
                 }
-                
-                document.getElementById('submitRateBtn').onclick = async () => {
-                    const score = parseFloat(document.getElementById('rateScore').value);
-                    const tScore = parseFloat(document.getElementById('rateTasteScore').value);
-                    const aScore = parseFloat(document.getElementById('rateAromaScore').value);
-                    const comment = document.getElementById('rateComment').value;
-                    const bLevel = document.getElementById('rateBodyLevel').value;
-                    const aLevel = document.getElementById('rateAromaLevel').value;
-                    
-                    let ssi = '';
-                    const activeSsi = document.querySelector('#rateSsiGroup .ssi-btn.active');
-                    if (activeSsi) ssi = activeSsi.dataset.type;
-                    
-                    try {
-                        const payload = {
-                            product_id: p.id,
-                            total_score: score,
-                            taste_score: tScore,
-                            aroma_score: aScore,
-                            comment: comment,
-                            user_name: currentUser.user_name,
-                            user_id: currentUser.user_id,
-                            ssi_type: ssi,
-                            body_level: bLevel,
-                            aroma_level: aLevel,
-                            rating_image: attachedImages[0] || null,
-                            rating_image_2: attachedImages[1] || null
-                        };
-                        
-                        if (!payload.rating_image) delete payload.rating_image;
-                        if (!payload.rating_image_2) delete payload.rating_image_2;
-
-                        const res = await fetch('/api/rate', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        const data = await res.json();
-                        if (data.status === 'success') {
-                            alert('コメントを保存しました');
-                            detailModal.classList.remove('show');
-                            if (currentMode === 'my_ratings') {
-                                loadMyRatings();
-                            } else {
-                                loadProducts(true);
-                            }
-                        } else {
-                            alert(data.message || 'エラーが発生しました');
-                        }
-                    } catch(e) {
-                        alert('通信エラー');
-                    }
-                };
-            } else {
-                commentSection.style.display = 'none';
+            } catch (err) {
+                console.error('showDetail error:', err);
+            } finally {
+                detailModal.classList.add('show');
             }
-
-            detailModal.classList.add('show');
         }
 
         // Initialize
