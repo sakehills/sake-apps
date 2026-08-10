@@ -1402,33 +1402,24 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
                 
-                if user_name == "hitocie":
-                    cursor.execute("SELECT id FROM user_flavor_ratings WHERE product_id = ? AND user_name = 'hitocie'", (product_id,))
-                    existing = cursor.fetchone()
-                    if existing:
-                        cursor.execute("""
-                            UPDATE user_flavor_ratings SET
-                                ssi_type = ?,
-                                body_level = ?,
-                                aroma_level = ?,
-                                comment = ?,
-                                rating_image = ?,
-                                rating_image_2 = ?,
-                                created_at = ?,
-                                total_score = ?,
-                                taste_score = ?,
-                                aroma_score = ?
-                            WHERE product_id = ? AND user_name = 'hitocie'
-                        """, (ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, datetime.now().isoformat(),
-                              total_score, taste_score, aroma_score, product_id))
-                    else:
-                        cursor.execute("""
-                            INSERT INTO user_flavor_ratings (
-                                product_id, ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, user_name, user_id, created_at,
-                                total_score, taste_score, aroma_score
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (product_id, ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, user_name, user_id, datetime.now().isoformat(),
-                              total_score, taste_score, aroma_score))
+                cursor.execute("SELECT id FROM user_flavor_ratings WHERE product_id = ? AND user_name = ?", (product_id, user_name))
+                existing = cursor.fetchone()
+                if existing:
+                    cursor.execute("""
+                        UPDATE user_flavor_ratings SET
+                            ssi_type = ?,
+                            body_level = ?,
+                            aroma_level = ?,
+                            comment = ?,
+                            rating_image = COALESCE(?, rating_image),
+                            rating_image_2 = COALESCE(?, rating_image_2),
+                            created_at = ?,
+                            total_score = ?,
+                            taste_score = ?,
+                            aroma_score = ?
+                        WHERE id = ?
+                    """, (ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, datetime.now().isoformat(),
+                          total_score, taste_score, aroma_score, existing[0]))
                 else:
                     cursor.execute("""
                         INSERT INTO user_flavor_ratings (
@@ -1439,6 +1430,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                           total_score, taste_score, aroma_score))
                 
                 conn.commit()
+                invalidate_server_cache()
                 print("[DEBUG] Transaction committed successfully.")
                 
             except Exception as e:
