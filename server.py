@@ -73,7 +73,8 @@ def save_base64_image(base64_str, prefix="img"):
 def process_admin_bottle_image(base64_str, product_id):
     """
     Decodes base64 image, fixes EXIF rotation, downsamples to max 800px,
-    performs fast background & border auto-cropping, and places bottle onto an 800x800 white 1:1 canvas.
+    performs OpenCV GrabCut background white-out & bottle bounding box crop,
+    and places bottle cleanly onto an 800x800 white 1:1 canvas.
     """
     if not base64_str: return None
     import base64, io, time
@@ -88,7 +89,7 @@ def process_admin_bottle_image(base64_str, product_id):
         img = Image.open(io.BytesIO(img_bytes))
         # EXIF rotation fix (fixes iPhone photo orientation!)
         img = ImageOps.exif_transpose(img)
-        img = img.convert("RGBA")
+        img = img.convert("RGB")
         
         # Fast downsample high-res photos to max 800px width/height first
         img.thumbnail((800, 800), Image.Resampling.LANCZOS)
@@ -104,7 +105,7 @@ def process_admin_bottle_image(base64_str, product_id):
     rembg_success = False
     try:
         from rembg import remove
-        removed = remove(img)
+        removed = remove(img.convert("RGBA"))
         bbox = removed.getbbox()
         if bbox:
             img = removed.crop(bbox)
@@ -112,14 +113,41 @@ def process_admin_bottle_image(base64_str, product_id):
     except Exception:
         pass
 
-    # 2. Fast auto-cropping bounding box (removes empty background margins)
+    # 2. OpenCV GrabCut background white-out & bottle bounding box crop
     if not rembg_success:
         try:
-            bbox = img.getbbox()
-            if bbox:
-                img = img.crop(bbox)
-        except Exception as crop_err:
-            print(f"Crop notice: {crop_err}")
+            import cv2
+            import numpy as np
+
+            img_np = np.array(img)
+            h, w, _ = img_np.shape
+
+            # GrabCut mask around center rectangle
+            mask = np.zeros((h, w), np.uint8)
+            bgdModel = np.zeros((1, 65), np.float64)
+            fgdModel = np.zeros((1, 65), np.float64)
+            rect = (int(w * 0.05), int(h * 0.04), int(w * 0.90), int(h * 0.92))
+            cv2.grabCut(img_np, mask, rect, bgdModel, fgdModel, 3, cv2.GC_INIT_WITH_RECT)
+
+            fg_mask = np.where((mask == 1) | (mask == 3), 255, 0).astype('uint8')
+            
+            # Smooth mask edges
+            kernel = np.ones((5, 5), np.uint8)
+            fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel)
+
+            # Bounding box of detected bottle
+            contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if contours:
+                c = max(contours, key=cv2.contourArea)
+                x, y, bw, bh = cv2.boundingRect(c)
+                if bw > w * 0.12 and bh > h * 0.12:
+                    # Create RGBA with background as transparent
+                    img_rgba_np = np.array(img.convert("RGBA"))
+                    img_rgba_np[:, :, 3] = fg_mask
+                    cropped_np = img_rgba_np[y:y+bh, x:x+bw]
+                    img = Image.fromarray(cropped_np)
+        except Exception as cv_err:
+            print(f"OpenCV whiteout notice: {cv_err}")
 
     # Re-check orientation after crop (must be vertical bottle!)
     if img.width > img.height:
@@ -147,7 +175,7 @@ def process_admin_bottle_image(base64_str, product_id):
 
     filename = f"prod_{product_id}_{int(time.time())}.jpg"
     filepath = os.path.join(admin_upload_dir, filename)
-    final_img.save(filepath, "JPEG", quality=90)
+    final_img.save(filepath, "JPEG", quality=92)
 
     return f"/cropped_images/admin_uploads/{filename}"
 
