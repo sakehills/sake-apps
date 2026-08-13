@@ -322,6 +322,144 @@ def analyze_label_with_gemini(image_base64):
         return None
 
 
+def analyze_front_label_with_gemini(image_base64):
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        print("警告: GEMINI_API_KEY が設定されていません。")
+        return None
+        
+    try:
+        from google import genai
+        clean_key = api_key.strip().replace('"', '').replace("'", "")
+        client = genai.Client(api_key=clean_key)
+        
+        # Base64をパース
+        if "," in image_base64:
+            header, encoded = image_base64.split(",", 1)
+            mime_type = header.split(";")[0].split(":")[1]
+        else:
+            encoded = image_base64
+            mime_type = "image/jpeg"
+            
+        img_bytes = base64.b64decode(encoded)
+        
+        prompt = '''この日本酒ボトルまたはラベル画像から、記載されている「銘柄名（商品ブランド名）」「酒蔵名（蔵元・醸造元）」「特定名称・種別（純米大吟醸、特別純米、スパークリング等）」およびその他特徴的なキーワードを読み取り、以下のキーを持つ純粋なJSONオブジェクトのみで返答してください。
+画像内に値が明記されていない、または判別できない項目は null に設定してください。
+※余計な文章やマークダウンの ```json 等の囲みは一切含めず、純粋なJSON文字列だけを返してください。
+
+【出力キーと型】
+{
+  "brand_name": "銘柄名（例: 獺祭, 新政, 八海山, 十四代 など）(または null)",
+  "brewery_name": "酒蔵名（例: 旭酒造, 新政酒造 など）(または null)",
+  "spec_name": "特定名称・スペック（例: 純米大吟醸 磨き三割九分 など）(または null)",
+  "keywords": ["ラベルに記載されているその他の特徴的単語の配列 (例: 山田錦, 生酒, 山口県 など)"]
+}'''
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                genai.types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
+                prompt
+            ]
+        )
+        text = response.text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        text = text.strip()
+        return json.loads(text)
+    except Exception as e:
+        print(f"Gemini表ラベルOCR解析エラー: {e}")
+        return None
+
+def search_products_by_ai_label(conn, ai_data):
+    """
+    AI抽出結果（銘柄名・酒蔵名・スペック等）を元にDB（productsテーブル）を検索しスコアリングして返却する
+    """
+    if not ai_data:
+        return []
+    
+    brand = (ai_data.get('brand_name') or '').strip()
+    brewery = (ai_data.get('brewery_name') or '').strip()
+    spec = (ai_data.get('spec_name') or '').strip()
+    keywords = ai_data.get('keywords') or []
+
+    cursor = conn.cursor()
+    
+    query_parts = []
+    params = []
+
+    if brand:
+        query_parts.append("p.brand_name LIKE ?")
+        params.append(f"%{brand}%")
+    if brewery:
+        query_parts.append("p.brewery_name LIKE ? OR b.name LIKE ?")
+        params.extend([f"%{brewery}%", f"%{brewery}%"])
+    for kw in keywords:
+        if isinstance(kw, str) and len(kw) >= 2 and kw not in (brand, brewery):
+            query_parts.append("(p.brand_name LIKE ? OR p.spec_name LIKE ? OR p.brewery_name LIKE ?)")
+            params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
+
+    if not query_parts:
+        cursor.execute("""
+            SELECT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture
+            FROM products p
+            LEFT JOIN breweries b ON p.brewery_name LIKE '%' || b.name || '%' OR b.name LIKE '%' || p.brewery_name || '%'
+            ORDER BY p.id DESC LIMIT 10
+        """)
+        rows = cursor.fetchall()
+        results = [dict(r) for r in rows]
+        for item in results:
+            item['match_score'] = 10
+        return results
+
+    sql = f"""
+        SELECT DISTINCT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture
+        FROM products p
+        LEFT JOIN breweries b ON p.brewery_name LIKE '%' || b.name || '%' OR b.name LIKE '%' || p.brewery_name || '%'
+        WHERE {" OR ".join(query_parts)}
+        LIMIT 50
+    """
+    cursor.execute(sql, params)
+    rows = cursor.fetchall()
+    
+    results = []
+    for r in rows:
+        item = dict(r)
+        score = 0
+        p_brand = item.get('brand_name') or ''
+        p_brewery = item.get('brewery_name') or ''
+        p_spec = item.get('spec_name') or ''
+        
+        if brand:
+            if brand == p_brand:
+                score += 50
+            elif brand in p_brand or p_brand in brand:
+                score += 35
+        
+        if brewery:
+            if brewery == p_brewery:
+                score += 30
+            elif brewery in p_brewery or p_brewery in brewery:
+                score += 20
+                
+        if spec:
+            if spec in p_spec or p_spec in spec:
+                score += 15
+                
+        for kw in keywords:
+            if isinstance(kw, str) and len(kw) >= 2:
+                if kw in p_brand or kw in p_brewery or kw in p_spec:
+                    score += 5
+
+        item['match_score'] = score
+        results.append(item)
+        
+    results.sort(key=lambda x: x['match_score'], reverse=True)
+    return results[:10]
+
+
 def generate_ai_comment_for_product(conn, product_id, user_name, image_path, image_path_2=None, custom_notes=""):
     cur = conn.cursor()
     cur.execute("SELECT * FROM products WHERE id = ?", (product_id,))
@@ -1747,6 +1885,66 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps(response).encode('utf-8'))
                 except Exception as send_error:
                     print(f"レスポンス送信失敗: {str(send_error)}")
+        elif self.path == "/api/search-by-label":
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+                image_base64 = data.get('image')
+                
+                if not image_base64:
+                    raise Exception("画像データが送られていません。")
+                
+                print("[AI Label Search] 表ラベル画像をGemini Visionで解析中...")
+                ai_result = analyze_front_label_with_gemini(image_base64)
+                
+                conn = sqlite3.connect(DB_PATH)
+                conn.row_factory = sqlite3.Row
+                
+                if ai_result:
+                    print(f"[AI Label Search] AI抽出結果: {ai_result}")
+                    matched_products = search_products_by_ai_label(conn, ai_result)
+                else:
+                    print("[AI Label Search] AI解析がスキップ/エラーのため、全件または最新の銘柄を検索フォールバック")
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        SELECT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture
+                        FROM products p
+                        LEFT JOIN breweries b ON p.brewery_name LIKE '%' || b.name || '%' OR b.name LIKE '%' || p.brewery_name || '%'
+                        ORDER BY p.id DESC LIMIT 10
+                    """)
+                    rows = cursor.fetchall()
+                    matched_products = [dict(r) for r in rows]
+                    for p in matched_products:
+                        p['match_score'] = 10
+                    ai_result = {
+                        "brand_name": "（AI解析不可/未設定）",
+                        "brewery_name": "",
+                        "spec_name": "",
+                        "keywords": []
+                    }
+                
+                conn.close()
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                res_payload = {
+                    "status": "success",
+                    "ai_analysis": ai_result,
+                    "products": matched_products
+                }
+                self.wfile.write(json.dumps(res_payload, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                print(f"[AI Label Search] エラー発生: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False).encode('utf-8'))
         elif self.path == "/api/product/import-csv":
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)

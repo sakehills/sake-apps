@@ -809,6 +809,224 @@
             color: var(--text-muted);
             font-size: 0.9rem;
         }
+
+        /* AI Label Search Component Styles */
+        .label-search-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            color: #ffffff;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .label-search-btn:active {
+            transform: scale(0.96);
+            box-shadow: 0 2px 6px rgba(168, 85, 247, 0.2);
+        }
+
+        .ai-label-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .ai-label-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .ai-label-modal-card {
+            background: #1e293b;
+            color: #f8fafc;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 480px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            transform: translateY(20px);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .ai-label-modal.active .ai-label-modal-card {
+            transform: translateY(0);
+        }
+        .ai-label-header {
+            padding: 18px 20px;
+            background: rgba(30, 41, 59, 0.95);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ai-label-title {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .ai-label-close {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #94a3b8;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .ai-label-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .ai-scanning-box {
+            position: relative;
+            width: 100%;
+            height: 220px;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        .ai-scanning-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .ai-scan-line {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, transparent, #818cf8, #c084fc, transparent);
+            box-shadow: 0 0 15px #c084fc;
+            animation: scanAnimation 2s infinite ease-in-out;
+        }
+        @keyframes scanAnimation {
+            0% { top: 0%; }
+            50% { top: 95%; }
+            100% { top: 0%; }
+        }
+
+        .ai-tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+        .ai-tag {
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(129, 140, 248, 0.3);
+            color: #c7d2fe;
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .ai-tag.brand {
+            background: rgba(168, 85, 247, 0.2);
+            border-color: rgba(192, 132, 252, 0.4);
+            color: #e9d5ff;
+            font-weight: 700;
+        }
+
+        .vivino-result-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .vivino-card {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 12px;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .vivino-card:hover, .vivino-card:active {
+            background: rgba(51, 65, 85, 0.9);
+            border-color: rgba(129, 140, 248, 0.5);
+            transform: scale(0.99);
+        }
+        .vivino-card-img {
+            width: 60px;
+            height: 75px;
+            object-fit: contain;
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 4px;
+            flex-shrink: 0;
+        }
+        .vivino-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .vivino-match-badge {
+            font-size: 11px;
+            font-weight: 700;
+            color: #34d399;
+            background: rgba(52, 211, 153, 0.15);
+            padding: 2px 8px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+        .vivino-card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
+        .vivino-card-sub {
+            font-size: 12px;
+            color: #94a3b8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .vivino-card-arrow {
+            color: #64748b;
+            font-size: 18px;
+            padding-right: 4px;
+        }
     </style>
 </head>
 <body>
@@ -822,9 +1040,15 @@
                 <span id="loginBtnText">ログイン</span>
             </button>
         </div>
-        <div class="search-bar">
-            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" id="searchInput" placeholder="銘柄・酒蔵名・特定名称（純米など）で検索...">
+        <div class="search-bar" style="display: flex; align-items: center; gap: 8px;">
+            <div style="position: relative; flex: 1; display: flex; align-items: center;">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="searchInput" placeholder="銘柄・酒蔵名・特定名称（純米など）で検索..." style="width: 100%;">
+            </div>
+            <button class="label-search-btn" id="openLabelSearchBtn" onclick="triggerLabelCamera()">
+                📷 ラベル検索
+            </button>
+            <input type="file" id="labelCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleLabelImageSelect(event)">
         </div>
         <!-- クイック検索チップス -->
         <div class="filter-scroll" id="chipContainer">
@@ -2221,6 +2445,181 @@
 
         // Initialize
         init();
+
+        // AI Label Search Handler Functions
+        function triggerLabelCamera() {
+            const input = document.getElementById('labelCameraInput');
+            if (input) input.click();
+        }
+
+        async function handleLabelImageSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            openAiLabelModal();
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Data = e.target.result;
+                renderAiLabelScanningState(base64Data);
+                await executeLabelSearch(base64Data);
+            };
+            reader.readAsDataURL(file);
+            event.target.value = '';
+        }
+
+        function openAiLabelModal() {
+            const modal = document.getElementById('aiLabelModal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeAiLabelModal() {
+            const modal = document.getElementById('aiLabelModal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        function renderAiLabelScanningState(imageSrc) {
+            const body = document.getElementById('aiLabelModalBody');
+            if (!body) return;
+            body.innerHTML = `
+                <div class="ai-scanning-box">
+                    <img src="${imageSrc}" class="ai-scanning-img">
+                    <div class="ai-scan-line"></div>
+                </div>
+                <div style="text-align: center; padding: 16px 0;">
+                    <div style="font-size: 16px; font-weight: 700; color: #818cf8; margin-bottom: 6px;">
+                        AIがラベルを高度解析中...
+                    </div>
+                    <div style="font-size: 12px; color: #94a3b8;">
+                        銘柄名・酒蔵・特定名称を検出してデータベースと照合しています
+                    </div>
+                </div>
+            `;
+        }
+
+        async function executeLabelSearch(base64Data) {
+            const body = document.getElementById('aiLabelModalBody');
+            try {
+                const res = await fetch('/api/search-by-label', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64Data })
+                });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    renderAiLabelResults(data.ai_analysis, data.products, base64Data);
+                } else {
+                    throw new Error(data.message || 'AI解析エラー');
+                }
+            } catch (err) {
+                console.error('Label search failed:', err);
+                if (body) {
+                    body.innerHTML = `
+                        <div style="text-align: center; padding: 30px 10px;">
+                            <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
+                            <div style="font-size: 15px; font-weight: 700; color: #f87171; margin-bottom: 8px;">
+                                解析に失敗しました
+                            </div>
+                            <div style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">
+                                ${err.message || 'ラベル画像から文字を正常に認識できませんでした。'}
+                            </div>
+                            <button onclick="triggerLabelCamera()" class="label-search-btn" style="margin: 0 auto;">
+                                📷 再度撮影する
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function renderAiLabelResults(ai, products, imageSrc) {
+            const body = document.getElementById('aiLabelModalBody');
+            if (!body) return;
+            
+            let tagsHtml = '';
+            if (ai && ai.brand_name) tagsHtml += `<span class="ai-tag brand">🏷️ ${ai.brand_name}</span>`;
+            if (ai && ai.brewery_name) tagsHtml += `<span class="ai-tag">🍶 ${ai.brewery_name}</span>`;
+            if (ai && ai.spec_name) tagsHtml += `<span class="ai-tag">✨ ${ai.spec_name}</span>`;
+            if (ai && ai.keywords && Array.isArray(ai.keywords)) {
+                ai.keywords.forEach(k => {
+                    if (k) tagsHtml += `<span class="ai-tag"># ${k}</span>`;
+                });
+            }
+
+            let cardsHtml = '';
+            if (products && products.length > 0) {
+                cardsHtml = products.map((p, idx) => {
+                    const matchScore = p.match_score || 0;
+                    const badge = idx === 0 && matchScore >= 35 ? '👑 最も一致' : (matchScore > 15 ? '✨ 候補' : '');
+                    const badgeHtml = badge ? `<span class="vivino-match-badge">${badge}</span>` : '';
+                    const imgUrl = p.cropped_image_path_front || p.image_url || '';
+                    const imgTag = imgUrl ? `<img src="${clean_img_url(imgUrl)}" class="vivino-card-img">` : `<div class="vivino-card-img" style="display:flex;align-items:center;justify-content:center;font-size:24px;">🍶</div>`;
+                    
+                    return `
+                        <div class="vivino-card" onclick="selectVivinoProduct(${p.id})">
+                            ${imgTag}
+                            <div class="vivino-card-info">
+                                ${badgeHtml}
+                                <div class="vivino-card-title">${p.brand_name || '銘柄名不明'}</div>
+                                <div class="vivino-card-sub">${p.brewery_name || ''} (${p.display_prefecture || p.prefecture || ''})</div>
+                                <div class="vivino-card-sub" style="font-size: 11px; color: #cbd5e1; margin-top:2px;">${p.spec_name || ''}</div>
+                            </div>
+                            <div class="vivino-card-arrow">›</div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                cardsHtml = `
+                    <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 13px;">
+                        該当する日本酒がデータベースに見つかりませんでした。
+                    </div>
+                `;
+            }
+
+            body.innerHTML = `
+                <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 14px; background: rgba(15, 23, 42, 0.4); padding: 8px; border-radius: 12px;">
+                    <img src="${imageSrc}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; flex-shrink: 0;">
+                    <div>
+                        <div style="font-size: 12px; color: #94a3b8;">AI認識キーワード</div>
+                        <div class="ai-tags-container" style="margin-top: 4px; margin-bottom: 0;">
+                            ${tagsHtml || '<span class="ai-tag">文字検出なし</span>'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>🔍 照合された銘柄 (${products ? products.length : 0}件)</span>
+                    <button onclick="triggerLabelCamera()" style="background:none; border:none; color:#818cf8; font-size:12px; cursor:pointer;">📷 再撮影</button>
+                </div>
+                
+                <div class="vivino-result-list">
+                    ${cardsHtml}
+                </div>
+            `;
+        }
+
+        function selectVivinoProduct(productId) {
+            closeAiLabelModal();
+            if (typeof showDetail === 'function') {
+                showDetail(productId);
+            }
+        }
     </script>
+
+    <!-- Vivino風 AIラベル検索 モーダル -->
+    <div class="ai-label-modal" id="aiLabelModal">
+        <div class="ai-label-modal-card">
+            <div class="ai-label-header">
+                <div class="ai-label-title">
+                    <span>📷 AIラベル判定結果</span>
+                </div>
+                <button class="ai-label-close" onclick="closeAiLabelModal()">&times;</button>
+            </div>
+            <div class="ai-label-body" id="aiLabelModalBody">
+                <!-- 解析中 or 判定結果が動的に挿入されます -->
+            </div>
+        </div>
+    </div>
 </body>
 </html>
