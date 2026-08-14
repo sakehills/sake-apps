@@ -2247,7 +2247,13 @@ async function executeLabelSearch(base64Data) {
     }
 }
 
+let lastAiAnalysisResult = null;
+let lastLabelSearchBase64 = null;
+
 function renderAiLabelResults(ai, products, imageSrc) {
+    lastAiAnalysisResult = ai;
+    lastLabelSearchBase64 = imageSrc;
+
     const body = document.getElementById('aiLabelModalBody');
     if (!body) return;
     
@@ -2310,6 +2316,13 @@ function renderAiLabelResults(ai, products, imageSrc) {
         <div class="vivino-result-list">
             ${cardsHtml}
         </div>
+
+        <div style="margin-top: 18px; padding-top: 14px; border-top: 1px dashed rgba(255,255,255,0.15); text-align: center;">
+            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">該当する日本酒が選択肢にありませんか？</div>
+            <button class="label-search-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 100%; justify-content: center; padding: 10px; font-size: 14px;" onclick="openNewProductRegisterModal()">
+                ➕ この日本酒を新しく登録・レビューする
+            </button>
+        </div>
     `;
 }
 
@@ -2317,6 +2330,85 @@ function selectVivinoProduct(productId) {
     closeAiLabelModal();
     if (typeof showModal === 'function') {
         showModal(productId);
+    }
+}
+
+function openNewProductRegisterModal() {
+    closeAiLabelModal();
+    const modal = document.getElementById('newProductRegisterModal');
+    if (!modal) return;
+    
+    const imgPreview = document.getElementById('newProdImgPreview');
+    const brandInput = document.getElementById('newProdBrandName');
+    const breweryInput = document.getElementById('newProdBreweryName');
+    const specInput = document.getElementById('newProdSpecName');
+    const prefInput = document.getElementById('newProdPrefecture');
+    const commentInput = document.getElementById('newProdComment');
+
+    if (imgPreview) imgPreview.src = lastLabelSearchBase64 || '';
+    if (brandInput) brandInput.value = (lastAiAnalysisResult && lastAiAnalysisResult.brand_name) ? lastAiAnalysisResult.brand_name : '';
+    if (breweryInput) breweryInput.value = (lastAiAnalysisResult && lastAiAnalysisResult.brewery_name) ? lastAiAnalysisResult.brewery_name : '';
+    if (specInput) specInput.value = (lastAiAnalysisResult && lastAiAnalysisResult.spec_name) ? lastAiAnalysisResult.spec_name : '';
+    if (prefInput) prefInput.value = '';
+    if (commentInput) commentInput.value = '';
+
+    modal.classList.add('active');
+}
+
+function closeNewProductRegisterModal() {
+    const modal = document.getElementById('newProductRegisterModal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function submitNewProductAndRating() {
+    const brandName = document.getElementById('newProdBrandName')?.value.trim();
+    if (!brandName) {
+        alert('銘柄名を入力してください。');
+        return;
+    }
+    
+    const breweryName = document.getElementById('newProdBreweryName')?.value.trim() || '';
+    const specName = document.getElementById('newProdSpecName')?.value.trim() || '';
+    const prefecture = document.getElementById('newProdPrefecture')?.value.trim() || '';
+    const ssiType = document.getElementById('newProdSsiType')?.value || '薫酒';
+    const totalScore = parseFloat(document.getElementById('newProdTotalScore')?.value || 4.0);
+    const comment = document.getElementById('newProdComment')?.value.trim() || '';
+    
+    const payload = {
+        brand_name: brandName,
+        brewery_name: breweryName,
+        spec_name: specName,
+        prefecture: prefecture,
+        image: lastLabelSearchBase64,
+        comment: comment,
+        total_score: totalScore,
+        taste_score: totalScore,
+        aroma_score: totalScore,
+        ssi_type: ssiType,
+        user_name: 'ユーザー',
+        user_id: 'user_registered'
+    };
+    
+    try {
+        const res = await fetch('/api/product/create-and-rate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            alert('新しい日本酒とレビューを正常に登録しました！');
+            closeNewProductRegisterModal();
+            if (data.product_id && typeof showModal === 'function') {
+                showModal(data.product_id);
+            }
+        } else {
+            alert(data.message || '登録に失敗しました。');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('通信エラーが発生しました。');
     }
 }
 </script>
@@ -2551,6 +2643,78 @@ function selectVivinoProduct(productId) {
         </div>
         <div class="ai-label-body" id="aiLabelModalBody">
             <!-- 解析中 or 判定結果が動的に挿入されます -->
+        </div>
+    </div>
+</div>
+
+<!-- Vivino風 新規日本酒登録＆評価投稿 モーダル -->
+<div class="ai-label-modal" id="newProductRegisterModal">
+    <div class="ai-label-modal-card" style="max-width: 500px;">
+        <div class="ai-label-header">
+            <div class="ai-label-title" style="background: linear-gradient(135deg, #34d399, #059669); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                <span>✨ 新しい日本酒を登録＆レビュー</span>
+            </div>
+            <button class="ai-label-close" onclick="closeNewProductRegisterModal()">&times;</button>
+        </div>
+        <div class="ai-label-body" style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; gap: 12px; align-items: center; background: rgba(15, 23, 42, 0.4); padding: 10px; border-radius: 12px;">
+                <img id="newProdImgPreview" src="" style="width: 65px; height: 65px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background:#0f172a;">
+                <div style="font-size: 12px; color: #94a3b8;">
+                    撮影したラベル写真とAI認識結果が自動入力されています。必要に応じて修正・追加入力してください。
+                </div>
+            </div>
+            
+            <div>
+                <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">銘柄名 (必須) *</label>
+                <input type="text" id="newProdBrandName" placeholder="例: 獺祭, 八海山" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">酒蔵名・蔵元</label>
+                    <input type="text" id="newProdBreweryName" placeholder="例: 旭酒造" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">特定名称・スペック</label>
+                    <input type="text" id="newProdSpecName" placeholder="例: 純米大吟醸" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+                </div>
+            </div>
+
+            <div>
+                <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">都道府県</label>
+                <input type="text" id="newProdPrefecture" placeholder="例: 山口県" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">味わいタイプ</label>
+                    <select id="newProdSsiType" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+                        <option value="薫酒">🌸 薫酒 (フルーティー・爽やか)</option>
+                        <option value="爽酒">💧 爽酒 (スッキリ・軽快)</option>
+                        <option value="醇酒">🌾 醇酒 (コク・米の旨味)</option>
+                        <option value="熟酒">🍂 熟酒 (熟成・濃厚)</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">総合評価 (5点満点)</label>
+                    <select id="newProdTotalScore" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+                        <option value="5.0">⭐️⭐️⭐️⭐️⭐️ (5.0 最高)</option>
+                        <option value="4.5">⭐️⭐️⭐️⭐️✨ (4.5)</option>
+                        <option value="4.0" selected>⭐️⭐️⭐️⭐️ (4.0 とても良い)</option>
+                        <option value="3.5">⭐️⭐️⭐️✨ (3.5)</option>
+                        <option value="3.0">⭐️⭐️⭐️ (3.0 普通)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">感想・レビューコメント</label>
+                <textarea id="newProdComment" rows="3" placeholder="香りの印象、飲んだ場所、料理との相性などを記入..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none; resize: vertical;"></textarea>
+            </div>
+
+            <button class="label-search-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 100%; justify-content: center; padding: 12px; font-size: 15px; font-weight: 700; margin-top: 6px;" onclick="submitNewProductAndRating()">
+                ✨ この日本酒を登録して投稿する
+            </button>
         </div>
     </div>
 </div>

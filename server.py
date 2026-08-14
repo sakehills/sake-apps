@@ -1945,6 +1945,78 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False).encode('utf-8'))
+        elif self.path == "/api/product/create-and-rate":
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            conn = None
+            try:
+                data = json.loads(post_data.decode('utf-8'))
+                brand_name = (data.get('brand_name') or '').strip()
+                brewery_name = (data.get('brewery_name') or '').strip()
+                spec_name = (data.get('spec_name') or '').strip()
+                prefecture = (data.get('prefecture') or '').strip()
+                image_base64 = data.get('image')
+                
+                comment = data.get('comment', '')
+                total_score = data.get('total_score', 4.0)
+                taste_score = data.get('taste_score', 4.0)
+                aroma_score = data.get('aroma_score', 4.0)
+                ssi_type = data.get('ssi_type', '薫酒')
+                body_level = data.get('body_level', 3)
+                aroma_level = data.get('aroma_level', 3)
+                user_name = data.get('user_name', '匿名')
+                user_id = data.get('user_id', 'user_registered')
+                
+                if not brand_name:
+                    raise Exception("銘柄名は必須です。")
+                
+                saved_image_path = None
+                if image_base64:
+                    saved_image_path = save_base64_image(image_base64, f"new_prod_{user_name}")
+                
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    INSERT INTO products (brand_name, brewery_name, spec_name, prefecture, cropped_image_path_front)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (brand_name, brewery_name, spec_name, prefecture, saved_image_path))
+                
+                product_id = cursor.lastrowid
+                
+                cursor.execute("""
+                    INSERT INTO user_flavor_ratings (
+                        product_id, ssi_type, body_level, aroma_level, comment, rating_image, user_name, user_id, created_at,
+                        total_score, taste_score, aroma_score
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (product_id, ssi_type, body_level, aroma_level, comment, saved_image_path, user_name, user_id, datetime.now().isoformat(),
+                      total_score, taste_score, aroma_score))
+                
+                conn.commit()
+                invalidate_server_cache()
+                print(f"[Create & Rate] 新規製品ID {product_id} ('{brand_name}') とレビューを登録しました。")
+                
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                res_payload = {
+                    "status": "success",
+                    "product_id": product_id,
+                    "message": "新しい日本酒とレビューを保存しました。"
+                }
+                self.wfile.write(json.dumps(res_payload, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                print(f"[Create & Rate] エラー: {e}")
+                self.send_response(500)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False).encode('utf-8'))
+            finally:
+                if conn:
+                    conn.close()
         elif self.path == "/api/product/import-csv":
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
