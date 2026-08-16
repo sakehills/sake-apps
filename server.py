@@ -24,6 +24,7 @@ import os
 import sqlite3
 import json
 import urllib.parse
+import urllib.request
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from datetime import datetime
 import sys
@@ -731,8 +732,6 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     print(f"Direct image serve error: {e}")
 
         if self.path.startswith("/api/image/proxy"):
-            import urllib.parse
-            import urllib.request
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             image_url = params.get('url', [None])[0]
@@ -766,7 +765,6 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             return
             
         elif self.path == "/api/products" or self.path.startswith("/api/products?"):
-            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             
