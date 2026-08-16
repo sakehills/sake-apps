@@ -675,7 +675,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
-                where_clauses = ["p.status != 'rejected'"]
+                where_clauses = ["(p.status IS NULL OR p.status != 'rejected')"]
                 query_args = []
 
                 if rated_by:
