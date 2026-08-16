@@ -1502,9 +1502,21 @@
 
         // 初期化
         async function init() {
-            await checkLoginStatus();
-            loadRecommendationsCarousel();
-            loadProducts(true);
+            try {
+                await checkLoginStatus();
+            } catch (e) {
+                console.error("checkLoginStatus error:", e);
+            }
+            try {
+                loadRecommendationsCarousel();
+            } catch (e) {
+                console.error("loadRecommendationsCarousel error:", e);
+            }
+            try {
+                await loadProducts(true);
+            } catch (e) {
+                console.error("loadProducts error:", e);
+            }
 
             // スクロールで追加読み込み
             window.addEventListener('scroll', () => {
