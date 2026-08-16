@@ -43,11 +43,28 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 def ensure_products_populated(conn):
     try:
         cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS products (
+                id INTEGER PRIMARY KEY,
+                brand_name TEXT,
+                brewery_name TEXT,
+                spec_name TEXT,
+                prefecture TEXT,
+                category TEXT,
+                cropped_image_path_front TEXT,
+                ssi_type TEXT,
+                comment TEXT,
+                status TEXT,
+                created_at TEXT
+            )
+        """)
+        conn.commit()
+
         cursor.execute("SELECT COUNT(*) FROM products")
         row = cursor.fetchone()
         count = row[0] if row else 0
         if count == 0:
-            print("[Auto DB Repair] products テーブルが0件のため、brandsから全10,096件を自動インサート中...")
+            print("[Auto DB Repair] products テーブルのデータを構築中...")
             query = """
                 SELECT 
                     b.id,
@@ -62,16 +79,20 @@ def ensure_products_populated(conn):
             for r in rows:
                 b_id, brand_name, brewery_name = r[0], r[1], r[2]
                 cursor.execute("""
-                    INSERT OR REPLACE INTO products (id, brand_name, brewery_name, spec_name, status, created_at)
-                    VALUES (?, ?, ?, ?, 'active', datetime('now'))
+                    INSERT OR REPLACE INTO products (id, brand_name, brewery_name, spec_name, status)
+                    VALUES (?, ?, ?, ?, 'active')
                 """, (b_id, brand_name or '', brewery_name or '', brand_name or ''))
             
-            cursor.execute("""
-                UPDATE products
-                SET ssi_type = (SELECT ssi_type FROM user_flavor_ratings WHERE product_id = products.id LIMIT 1),
-                    comment = (SELECT comment FROM user_flavor_ratings WHERE product_id = products.id LIMIT 1)
-                WHERE id IN (SELECT DISTINCT product_id FROM user_flavor_ratings)
-            """)
+            try:
+                cursor.execute("""
+                    UPDATE products
+                    SET ssi_type = (SELECT ssi_type FROM user_flavor_ratings WHERE product_id = products.id LIMIT 1),
+                        comment = (SELECT comment FROM user_flavor_ratings WHERE product_id = products.id LIMIT 1)
+                    WHERE id IN (SELECT DISTINCT product_id FROM user_flavor_ratings)
+                """)
+            except Exception as update_err:
+                print(f"[Auto DB Repair Update Warning]: {update_err}")
+                
             conn.commit()
             print(f"[Auto DB Repair] 自動展開完了: {len(rows)} 件の銘柄データを復元しました。")
     except Exception as e:
@@ -906,8 +927,19 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps(res_payload, ensure_ascii=False).encode('utf-8'))
             except Exception as e:
                 print(f"Products API error: {e}")
-                self.send_response(500)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
+                res_payload = {
+                    "items": [],
+                    "page": 1,
+                    "limit": limit if 'limit' in locals() else 30,
+                    "total_items": 0,
+                    "total_pages": 1,
+                    "error": str(e)
+                }
+                self.wfile.write(json.dumps(res_payload, ensure_ascii=False).encode('utf-8'))
             finally:
                 if conn: conn.close()
             return
