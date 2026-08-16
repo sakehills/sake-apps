@@ -102,6 +102,32 @@ def ensure_products_populated(conn):
                 
             conn.commit()
             print(f"[Auto DB Repair] 自動展開完了: {len(rows)} 件の銘柄データを復元しました。")
+
+        # 画像パスの常時同期・復元（user_flavor_ratings投稿写真 ＆ sake_bottles公式写真）
+        try:
+            cursor.execute("""
+                UPDATE products
+                SET cropped_image_path_front = (
+                    SELECT rating_image FROM user_flavor_ratings 
+                    WHERE product_id = products.id AND rating_image IS NOT NULL AND rating_image != '' 
+                    ORDER BY id DESC LIMIT 1
+                )
+                WHERE (cropped_image_path_front IS NULL OR cropped_image_path_front = '')
+                  AND id IN (SELECT DISTINCT product_id FROM user_flavor_ratings WHERE rating_image IS NOT NULL AND rating_image != '')
+            """)
+            cursor.execute("""
+                UPDATE products
+                SET cropped_image_path_front = (
+                    SELECT cropped_image_path_front FROM sake_bottles 
+                    WHERE brand_name = products.brand_name OR id = products.id 
+                    LIMIT 1
+                )
+                WHERE (cropped_image_path_front IS NULL OR cropped_image_path_front = '')
+                  AND id IN (SELECT id FROM sake_bottles WHERE cropped_image_path_front IS NOT NULL AND cropped_image_path_front != '')
+            """)
+            conn.commit()
+        except Exception as img_err:
+            print(f"[Auto DB Image Sync Warning]: {img_err}")
     except Exception as e:
         print(f"[Auto DB Repair エラー]: {e}")
 
