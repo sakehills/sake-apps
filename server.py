@@ -19,37 +19,6 @@ def clean_img_url(p):
     return '/' + '/'.join(encoded_parts)
 
 def get_image_as_data_url(file_path):
-    if not file_path:
-        return ""
-    if str(file_path).startswith("data:image/"):
-        return str(file_path)
-        
-    p_str = str(file_path).replace('\\', '/').strip()
-    idx = p_str.find('cropped_images')
-    if idx != -1:
-        rel = p_str[idx:]
-    else:
-        idx_up = p_str.find('uploaded_images')
-        if idx_up != -1:
-            rel = p_str[idx_up:]
-        else:
-            rel = p_str.lstrip('/')
-
-    abs_path = os.path.join(BASE_DIR, rel)
-    if os.path.exists(abs_path) and os.path.isfile(abs_path):
-        try:
-            ext = os.path.splitext(abs_path)[1].lower()
-            mime = "image/jpeg"
-            if ext == ".png": mime = "image/png"
-            elif ext == ".webp": mime = "image/webp"
-            elif ext == ".gif": mime = "image/gif"
-            
-            with open(abs_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode('utf-8')
-            return f"data:{mime};base64,{encoded}"
-        except Exception as e:
-            print(f"Base64 encode error for {abs_path}: {e}")
-            
     return clean_img_url(file_path)
 
 # In-Memory Cache Globals
