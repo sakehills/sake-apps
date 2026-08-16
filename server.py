@@ -40,6 +40,43 @@ import uuid
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploaded_images")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+def ensure_products_populated(conn):
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM products")
+        row = cursor.fetchone()
+        count = row[0] if row else 0
+        if count == 0:
+            print("[Auto DB Repair] products テーブルが0件のため、brandsから全10,096件を自動インサート中...")
+            query = """
+                SELECT 
+                    b.id,
+                    b.name as brand_name,
+                    br.name as brewery_name
+                FROM brands b
+                LEFT JOIN breweries br ON b.brewery_id = br.id
+            """
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            
+            for r in rows:
+                b_id, brand_name, brewery_name = r[0], r[1], r[2]
+                cursor.execute("""
+                    INSERT OR REPLACE INTO products (id, brand_name, brewery_name, spec_name, status, created_at)
+                    VALUES (?, ?, ?, ?, 'active', datetime('now'))
+                """, (b_id, brand_name or '', brewery_name or '', brand_name or ''))
+            
+            cursor.execute("""
+                UPDATE products
+                SET ssi_type = (SELECT ssi_type FROM user_flavor_ratings WHERE product_id = products.id LIMIT 1),
+                    comment = (SELECT comment FROM user_flavor_ratings WHERE product_id = products.id LIMIT 1)
+                WHERE id IN (SELECT DISTINCT product_id FROM user_flavor_ratings)
+            """)
+            conn.commit()
+            print(f"[Auto DB Repair] 自動展開完了: {len(rows)} 件の銘柄データを復元しました。")
+    except Exception as e:
+        print(f"[Auto DB Repair エラー]: {e}")
+
 def save_base64_image(base64_str, prefix="img"):
     if not base64_str or not base64_str.startswith("data:image/"):
         return base64_str
@@ -672,6 +709,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             conn = None
             try:
                 conn = sqlite3.connect(DB_PATH)
+                ensure_products_populated(conn)
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
