@@ -18,6 +18,40 @@ def clean_img_url(p):
     encoded_parts = [urllib.parse.quote(part) for part in parts]
     return '/' + '/'.join(encoded_parts)
 
+def get_image_as_data_url(file_path):
+    if not file_path:
+        return ""
+    if str(file_path).startswith("data:image/"):
+        return str(file_path)
+        
+    p_str = str(file_path).replace('\\', '/').strip()
+    idx = p_str.find('cropped_images')
+    if idx != -1:
+        rel = p_str[idx:]
+    else:
+        idx_up = p_str.find('uploaded_images')
+        if idx_up != -1:
+            rel = p_str[idx_up:]
+        else:
+            rel = p_str.lstrip('/')
+
+    abs_path = os.path.join(BASE_DIR, rel)
+    if os.path.exists(abs_path) and os.path.isfile(abs_path):
+        try:
+            ext = os.path.splitext(abs_path)[1].lower()
+            mime = "image/jpeg"
+            if ext == ".png": mime = "image/png"
+            elif ext == ".webp": mime = "image/webp"
+            elif ext == ".gif": mime = "image/gif"
+            
+            with open(abs_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode('utf-8')
+            return f"data:{mime};base64,{encoded}"
+        except Exception as e:
+            print(f"Base64 encode error for {abs_path}: {e}")
+            
+    return clean_img_url(file_path)
+
 # In-Memory Cache Globals
 PRODUCTS_CACHE_BYTES = None
 MAP_CACHE_BYTES = None
@@ -127,7 +161,7 @@ def ensure_products_populated(conn):
                 UPDATE products
                 SET cropped_image_path_front = (
                     SELECT cropped_image_path_front FROM sake_bottles 
-                    WHERE brand_name = products.brand_name OR id = products.id 
+                    WHERE sake_bottles.id = products.id OR sake_bottles.name LIKE '%' || products.brand_name || '%'
                     LIMIT 1
                 )
                 WHERE (cropped_image_path_front IS NULL OR cropped_image_path_front = '')
@@ -986,7 +1020,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                                 if r_item.get('rating_image'):
                                     img = r_item['rating_image']
                                     break
-                        p['cropped_image_path_front'] = clean_img_url(img)
+                        p['cropped_image_path_front'] = get_image_as_data_url(img)
                         p['alcohol_content'] = p.get('alcohol')
                         p['awards'] = awards_map.get(pid, [])
                         p['ratings'] = ratings_map.get(pid, [])
@@ -1089,7 +1123,15 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                         if pid not in ratings_map: ratings_map[pid] = []
                         ratings_map[pid].append(dict(r))
                     for p in top_recs:
-                        p['ratings'] = ratings_map.get(p['id'], [])
+                        pid = p['id']
+                        p['ratings'] = ratings_map.get(pid, [])
+                        img = p.get('cropped_image_path_front')
+                        if not img:
+                            for r_item in p['ratings']:
+                                if r_item.get('rating_image'):
+                                    img = r_item['rating_image']
+                                    break
+                        p['cropped_image_path_front'] = get_image_as_data_url(img)
                 
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
