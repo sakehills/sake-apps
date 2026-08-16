@@ -1528,18 +1528,32 @@
                 }
             });
 
-            // 検索インプットイベント
+            // 検索インプットイベント（入力・確定・Enterキー即時対応）
+            const triggerSearch = (val) => {
+                currentSearch = val.trim();
+                currentSsiFilter = '';
+                currentCollection = '';
+                updateChipUI('all');
+                updateFlavorCardUI();
+                loadProducts(true);
+            };
+
             let debounceTimer;
             searchInput.addEventListener('input', (e) => {
                 clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    currentSearch = e.target.value.trim();
-                    currentSsiFilter = '';
-                    currentCollection = '';
-                    updateChipUI('all');
-                    updateFlavorCardUI();
-                    loadProducts(true);
-                }, 400);
+                debounceTimer = setTimeout(() => triggerSearch(e.target.value), 300);
+            });
+            searchInput.addEventListener('change', (e) => {
+                clearTimeout(debounceTimer);
+                triggerSearch(e.target.value);
+            });
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    clearTimeout(debounceTimer);
+                    triggerSearch(e.target.value);
+                    searchInput.blur();
+                }
             });
 
             // ソート選択イベント

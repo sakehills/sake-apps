@@ -1846,7 +1846,17 @@ document.addEventListener('DOMContentLoaded', initAuth);
             const imageFilter = document.getElementById('imageFilter');
             const sortOrder = document.getElementById('sortOrder');
             
-            if (searchInput) searchInput.addEventListener('input', filterData);
+            if (searchInput) {
+                searchInput.addEventListener('input', filterData);
+                searchInput.addEventListener('change', filterData);
+                searchInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        filterData();
+                        searchInput.blur();
+                    }
+                });
+            }
             if (breweryFilter) breweryFilter.addEventListener('change', filterData);
             if (typeFilter) typeFilter.addEventListener('change', filterData);
             if (ssiFilter) ssiFilter.addEventListener('change', filterData);

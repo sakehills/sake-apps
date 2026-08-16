@@ -706,6 +706,30 @@ class SakeApiServer(SimpleHTTPRequestHandler):
         rel_path = clean_path.lstrip('/')
         return os.path.join(BASE_DIR, rel_path)
     def do_GET(self):
+        # 画像ファイル（/uploaded_images/ および /cropped_images/）の静的配信
+        clean_p = urllib.parse.unquote(self.path.split('?')[0].split('#')[0])
+        if clean_p.startswith('/uploaded_images/') or clean_p.startswith('/cropped_images/'):
+            file_path = os.path.join(BASE_DIR, clean_p.lstrip('/'))
+            if os.path.exists(file_path):
+                ext = os.path.splitext(file_path)[1].lower()
+                mime = 'image/jpeg'
+                if ext == '.png': mime = 'image/png'
+                elif ext == '.webp': mime = 'image/webp'
+                elif ext == '.gif': mime = 'image/gif'
+                
+                try:
+                    with open(file_path, 'rb') as f:
+                        img_bytes = f.read()
+                    self.send_response(200)
+                    self.send_header('Content-Type', mime)
+                    self.send_header('Cache-Control', 'public, max-age=86400')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(img_bytes)
+                    return
+                except Exception as e:
+                    print(f"Direct image serve error: {e}")
+
         if self.path.startswith("/api/image/proxy"):
             import urllib.parse
             import urllib.request
@@ -775,9 +799,16 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     query_args.append(rated_by)
 
                 if search:
-                    where_clauses.append("(LOWER(p.brand_name) LIKE LOWER(?) OR LOWER(p.brewery_name) LIKE LOWER(?) OR LOWER(p.spec_name) LIKE LOWER(?) OR LOWER(COALESCE(p.prefecture, b.prefecture, '')) LIKE LOWER(?))")
+                    where_clauses.append("""(
+                        LOWER(p.brand_name) LIKE LOWER(?) OR 
+                        LOWER(p.brewery_name) LIKE LOWER(?) OR 
+                        LOWER(p.spec_name) LIKE LOWER(?) OR 
+                        LOWER(COALESCE(p.prefecture, b.prefecture, '')) LIKE LOWER(?) OR
+                        LOWER(COALESCE(b.name, '')) LIKE LOWER(?) OR
+                        LOWER(COALESCE(b.name_kana, '')) LIKE LOWER(?)
+                    )""")
                     term = f"%{search}%"
-                    query_args.extend([term, term, term, term])
+                    query_args.extend([term, term, term, term, term, term])
 
                 if brewery:
                     where_clauses.append("(p.brewery_name LIKE ? OR p.brand_name LIKE ?)")
