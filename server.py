@@ -1,13 +1,15 @@
 def clean_img_url(p):
     if not p: return ''
     p_str = str(p).replace('\\', '/').strip()
+    if p_str.startswith('data:image/'):
+        return p_str
     idx = p_str.find('cropped_images')
     if idx != -1:
         return '/' + p_str[idx:]
     idx_up = p_str.find('uploaded_images')
     if idx_up != -1:
         return '/' + p_str[idx_up:]
-    if not p_str.startswith('/') and not p_str.startswith('http://') and not p_str.startswith('https://') and not p_str.startswith('data:'):
+    if not p_str.startswith('/') and not p_str.startswith('http://') and not p_str.startswith('https://'):
         return '/' + p_str
     return p_str
 
@@ -795,16 +797,19 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     query_args.append(rated_by)
 
                 if search:
-                    where_clauses.append("""(
-                        LOWER(p.brand_name) LIKE LOWER(?) OR 
-                        LOWER(p.brewery_name) LIKE LOWER(?) OR 
-                        LOWER(p.spec_name) LIKE LOWER(?) OR 
-                        LOWER(COALESCE(p.prefecture, b.prefecture, '')) LIKE LOWER(?) OR
-                        LOWER(COALESCE(b.name, '')) LIKE LOWER(?) OR
-                        LOWER(COALESCE(b.name_kana, '')) LIKE LOWER(?)
-                    )""")
-                    term = f"%{search}%"
-                    query_args.extend([term, term, term, term, term, term])
+                    search_terms = search.replace('　', ' ').split()
+                    for term_text in search_terms:
+                        if not term_text: continue
+                        t_like = f"%{term_text}%"
+                        where_clauses.append("""(
+                            LOWER(p.brand_name) LIKE LOWER(?) OR 
+                            LOWER(p.brewery_name) LIKE LOWER(?) OR 
+                            LOWER(p.spec_name) LIKE LOWER(?) OR 
+                            LOWER(COALESCE(b.prefecture, '')) LIKE LOWER(?) OR
+                            LOWER(COALESCE(b.name, '')) LIKE LOWER(?) OR
+                            LOWER(COALESCE(b.kura_name, '')) LIKE LOWER(?)
+                        )""")
+                        query_args.extend([t_like, t_like, t_like, t_like, t_like, t_like])
 
                 if brewery:
                     where_clauses.append("(p.brewery_name LIKE ? OR p.brand_name LIKE ?)")
@@ -965,10 +970,18 @@ class SakeApiServer(SimpleHTTPRequestHandler):
 
                     for p in products:
                         pid = p['id']
-                        p['name'] = p.get('brand_name') or ''
+                        p['name'] = p.get('brand_name') or p.get('spec_name') or ''
                         p['sake_type'] = p.get('category') or ''
                         p['brewery'] = p.get('brewery_name') or ''
-                        p['cropped_image_path_front'] = clean_img_url(p.get('cropped_image_path_front'))
+                        
+                        img = p.get('cropped_image_path_front')
+                        if not img:
+                            r_list = ratings_map.get(pid, [])
+                            for r_item in r_list:
+                                if r_item.get('rating_image'):
+                                    img = r_item['rating_image']
+                                    break
+                        p['cropped_image_path_front'] = clean_img_url(img)
                         p['alcohol_content'] = p.get('alcohol')
                         p['awards'] = awards_map.get(pid, [])
                         p['ratings'] = ratings_map.get(pid, [])
