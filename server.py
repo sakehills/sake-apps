@@ -60,6 +60,12 @@ def ensure_products_populated(conn):
         """)
         conn.commit()
 
+        try:
+            cursor.execute("ALTER TABLE products ADD COLUMN prefecture TEXT")
+            conn.commit()
+        except Exception:
+            pass
+
         cursor.execute("SELECT COUNT(*) FROM products")
         row = cursor.fetchone()
         count = row[0] if row else 0
@@ -69,7 +75,8 @@ def ensure_products_populated(conn):
                 SELECT 
                     b.id,
                     b.name as brand_name,
-                    br.name as brewery_name
+                    br.name as brewery_name,
+                    br.prefecture as prefecture
                 FROM brands b
                 LEFT JOIN breweries br ON b.brewery_id = br.id
             """
@@ -77,11 +84,11 @@ def ensure_products_populated(conn):
             rows = cursor.fetchall()
             
             for r in rows:
-                b_id, brand_name, brewery_name = r[0], r[1], r[2]
+                b_id, brand_name, brewery_name, pref = r[0], r[1], r[2], r[3]
                 cursor.execute("""
-                    INSERT OR REPLACE INTO products (id, brand_name, brewery_name, spec_name, status)
-                    VALUES (?, ?, ?, ?, 'active')
-                """, (b_id, brand_name or '', brewery_name or '', brand_name or ''))
+                    INSERT OR REPLACE INTO products (id, brand_name, brewery_name, spec_name, prefecture, status)
+                    VALUES (?, ?, ?, ?, ?, 'active')
+                """, (b_id, brand_name or '', brewery_name or '', brand_name or '', pref or ''))
             
             try:
                 cursor.execute("""
@@ -856,6 +863,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     order_clause = "ORDER BY p.brand_name ASC"
 
                 # Main Data query with LIMIT & OFFSET
+                data_sql = f"SELECT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture FROM {from_str} WHERE {where_str} {order_clause} LIMIT ? OFFSET ?"
                 cursor.execute(data_sql, query_args + [limit, offset])
                 products = [dict(r) for r in cursor.fetchall()]
 
