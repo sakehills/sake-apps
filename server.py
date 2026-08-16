@@ -6,17 +6,13 @@ def clean_img_url(p):
     
     idx = p_str.find('cropped_images')
     if idx != -1:
-        rel = p_str[idx:]
-    else:
-        idx_up = p_str.find('uploaded_images')
-        if idx_up != -1:
-            rel = p_str[idx_up:]
-        else:
-            rel = p_str.lstrip('/')
-
-    parts = rel.split('/')
-    encoded_parts = [urllib.parse.quote(part) for part in parts]
-    return '/' + '/'.join(encoded_parts)
+        return '/' + p_str[idx:]
+    idx_up = p_str.find('uploaded_images')
+    if idx_up != -1:
+        return '/' + p_str[idx_up:]
+    if not p_str.startswith('/') and not p_str.startswith('http'):
+        return '/' + p_str
+    return p_str
 
 def get_image_as_data_url(file_path):
     return clean_img_url(file_path)
