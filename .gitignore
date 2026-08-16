@@ -1,6 +1,5 @@
-# データベースとアップロード画像（本番環境と同期・上書きさせないための除外設定）
-database/sake_database.db
-uploaded_images/*
+# データベースとアップロード画像
+# uploaded_images/*
 !uploaded_images/.gitkeep
 
 # キャッシュ・一時ファイル

@@ -3,15 +3,20 @@ def clean_img_url(p):
     p_str = str(p).replace('\\', '/').strip()
     if p_str.startswith('data:image/'):
         return p_str
+    
     idx = p_str.find('cropped_images')
     if idx != -1:
-        return '/' + p_str[idx:]
-    idx_up = p_str.find('uploaded_images')
-    if idx_up != -1:
-        return '/' + p_str[idx_up:]
-    if not p_str.startswith('/') and not p_str.startswith('http://') and not p_str.startswith('https://'):
-        return '/' + p_str
-    return p_str
+        rel = p_str[idx:]
+    else:
+        idx_up = p_str.find('uploaded_images')
+        if idx_up != -1:
+            rel = p_str[idx_up:]
+        else:
+            rel = p_str.lstrip('/')
+
+    parts = rel.split('/')
+    encoded_parts = [urllib.parse.quote(part) for part in parts]
+    return '/' + '/'.join(encoded_parts)
 
 # In-Memory Cache Globals
 PRODUCTS_CACHE_BYTES = None
