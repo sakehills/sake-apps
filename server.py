@@ -835,9 +835,30 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     order_clause = "ORDER BY p.brand_name ASC"
 
                 # Main Data query with LIMIT & OFFSET
-                data_sql = f"SELECT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture FROM {from_str} WHERE {where_str} {order_clause} LIMIT ? OFFSET ?"
                 cursor.execute(data_sql, query_args + [limit, offset])
                 products = [dict(r) for r in cursor.fetchall()]
+
+                # もし products が 0 件の場合、brands テーブルから直接自動フォールバック取得
+                if not products and not search and not brewery and not prefecture and not sake_type and not ssi and not collection and not rated_by:
+                    print("[Dual Fallback] productsが0件のため、brandsから直接10,096件の一覧を取得します...")
+                    cursor.execute("""
+                        SELECT 
+                            b.id,
+                            b.name as brand_name,
+                            br.name as brewery_name,
+                            COALESCE(br.prefecture, '') as display_prefecture,
+                            b.name as spec_name
+                        FROM brands b
+                        LEFT JOIN breweries br ON b.brewery_id = br.id
+                        ORDER BY b.id DESC
+                        LIMIT ? OFFSET ?
+                    """, (limit, offset))
+                    fallback_rows = cursor.fetchall()
+                    products = [dict(r) for r in fallback_rows]
+                    
+                    cursor.execute("SELECT COUNT(*) FROM brands")
+                    total_items = cursor.fetchone()[0]
+                    total_pages = max(1, (total_items + limit - 1) // limit)
 
                 # Attach awards & ratings ONLY for the 30 returned products
                 if products:
