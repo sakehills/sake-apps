@@ -271,8 +271,6 @@ def process_admin_bottle_image(base64_str, product_id, auto_crop=True):
 
     return f"/cropped_images/admin_uploads/{filename}"
 
-import urllib.parse
-import urllib.request
 import re
 
 def search_web_snippets(query):
@@ -1007,7 +1005,6 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
         elif self.path.startswith("/api/recommendations"):
-            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             user_name = params.get('user', ['hitoshi'])[0]
@@ -1088,7 +1085,6 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
         elif self.path.startswith("/api/brewery_admin/analytics"):
-            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             brewery = params.get('brewery', ['旭酒造'])[0]
@@ -1183,7 +1179,6 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
         elif self.path.startswith("/api/brewery_admin/products"):
-            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             brewery = params.get('brewery', [None])[0]
@@ -1212,7 +1207,6 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             return
 
         elif self.path.startswith("/api/brewery"):
-            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             name = params.get('name', [None])[0]
@@ -1275,7 +1269,6 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     conn.close()
 
         elif self.path.startswith("/api/competition"):
-            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             comp_id = params.get('id', [None])[0]

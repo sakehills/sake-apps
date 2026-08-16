@@ -2,6 +2,8 @@ import os
 import sys
 import io
 import http.client
+import urllib.parse
+import urllib.request
 
 # ディレクトリパスの設定とカレントディレクトリの移動
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
