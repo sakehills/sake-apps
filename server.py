@@ -343,7 +343,7 @@ def extract_specs_with_gemini(brand, brewery, search_text):
 {search_text}'''
         
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-3.6-flash',
             contents=prompt
         )
         text = response.text.strip()
@@ -400,7 +400,7 @@ def analyze_label_with_gemini(image_base64):
 }'''
         
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-3.6-flash',
             contents=[
                 genai.types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
                 prompt
@@ -452,7 +452,7 @@ def analyze_front_label_with_gemini(image_base64):
 }'''
         
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=[
                 genai.types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
                 prompt
