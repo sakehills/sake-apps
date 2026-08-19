@@ -1838,6 +1838,18 @@ document.addEventListener('DOMContentLoaded', initAuth);
     </div>
 
     <script>
+        function clean_img_url(url) {
+            if (!url) return '';
+            let s = String(url).replace(/\\/g, '/').strip ? String(url).replace(/\\/g, '/').trim() : String(url);
+            if (s.startsWith('data:image/')) return s;
+            let idx = s.indexOf('cropped_images');
+            if (idx !== -1) return '/' + s.substring(idx);
+            let idxUp = s.indexOf('uploaded_images');
+            if (idxUp !== -1) return '/' + s.substring(idxUp);
+            if (!s.startsWith('/') && !s.startsWith('http')) return '/' + s;
+            return s;
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('searchInput');
             const breweryFilter = document.getElementById('breweryFilter');
@@ -2284,7 +2296,7 @@ function renderAiLabelResults(ai, products, imageSrc) {
             const badge = idx === 0 && matchScore >= 35 ? '👑 最も一致' : (matchScore > 15 ? '✨ 候補' : '');
             const badgeHtml = badge ? `<span class="vivino-match-badge">${badge}</span>` : '';
             const imgUrl = p.cropped_image_path_front || p.image_url || '';
-            const imgTag = imgUrl ? `<img src="${clean_img_url(imgUrl)}" class="vivino-card-img">` : `<div class="vivino-card-img" style="display:flex;align-items:center;justify-content:center;font-size:24px;">🍶</div>`;
+            const imgTag = imgUrl ? `<img src="${imgUrl}" class="vivino-card-img">` : `<div class="vivino-card-img" style="display:flex;align-items:center;justify-content:center;font-size:24px;">🍶</div>`;
             
             return `
                 <div class="vivino-card" onclick="selectVivinoProduct(${p.id})">
