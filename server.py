@@ -301,60 +301,47 @@ def search_web_snippets(query):
         print(f"検索エラー (HTML GET): {e}")
         return ""
 
+def _call_gemini_rest(api_key, prompt_text, image_base64=None):
+    """Gemini REST APIを直接呼び出す共通関数（SDK不要・標準ライブラリのみ）"""
+    clean_key = api_key.strip().replace('"', '').replace("'", "")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={clean_key}"
+    
+    parts = []
+    if image_base64:
+        if "," in image_base64:
+            header, encoded = image_base64.split(",", 1)
+            mime_type = header.split(";")[0].split(":")[1]
+        else:
+            encoded = image_base64
+            mime_type = "image/jpeg"
+        parts.append({"inline_data": {"mime_type": mime_type, "data": encoded}})
+    parts.append({"text": prompt_text})
+    
+    payload = json.dumps({"contents": [{"parts": parts}]})
+    req = urllib.request.Request(url, data=payload.encode('utf-8'), headers={'Content-Type': 'application/json'})
+    
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        result = json.loads(resp.read().decode('utf-8'))
+    
+    text = result['candidates'][0]['content']['parts'][0]['text'].strip()
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+    return json.loads(text.strip())
+
 def extract_specs_with_gemini(brand, brewery, search_text):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         print("警告: GEMINI_API_KEY が設定されていません。")
-        return {
-            "category": None, "alcohol": None, "polish_ratio": None,
-            "ingredients": None, "rice_variety": None, "yeast": None,
-            "smv": None, "acidity": None, "amino_acidity": None,
-            "heating_type": None, "is_genshu": None, "brewing_method": None, "serving_temperature": None,
-            "confidence": 0.0
-        }
-        
+        return {"category": None, "alcohol": None, "polish_ratio": None, "ingredients": None, "rice_variety": None, "yeast": None, "smv": None, "acidity": None, "amino_acidity": None, "heating_type": None, "is_genshu": None, "brewing_method": None, "serving_temperature": None, "confidence": 0.0}
     try:
-        from google import genai
-        clean_key = api_key.strip().replace('"', '').replace("'", "")
-        client = genai.Client(api_key=clean_key)
-        
-        prompt = f'''以下の検索テキスト情報を元に、日本酒「{brand}」（製造蔵: {brewery}）の製品スペック（特定名称、アルコール度数、精米歩合、原材料、原料米、使用酵母、日本酒度、酸度、アミノ酸度、およびディープスペックとして火入れ回数/タイプ、原酒かどうか、仕込み方法、推奨飲用温度帯）を抽出し、以下のキーを持つ純粋なJSONオブジェクトのみで返答してください。推測が含まれる場合は confidence を低く（0.5〜0.6）、確実な場合は高く（0.8〜0.9）設定してください。情報がない場合は null にしてください。
-※余計な文章やマークダウンの ```json 等の囲みは一切含めず、純粋なJSON文字列だけを返してください。
-
-【出力キーと型】
-{{
-  "category": "純米吟醸 などの特定名称文字列 (または null)",
-  "alcohol": 15.5 などの数値 (または null)",
-  "polish_ratio": "50% などの文字列 (または null)",
-  "ingredients": "米、米麹 などのカンマ区切り文字列 (または null)",
-  "rice_variety": "山田錦 などの文字列 (または null)",
-  "yeast": "協会9号 などの酵母名 (または null)",
-  "smv": "+3.0 などの符号付き日本酒度 (または null)",
-  "acidity": "1.4 などの酸度数値文字列 (占有は null)",
-  "amino_acidity": "1.2 などのアミノ酸度数値文字列 (または null)",
-  "heating_type": "生酒, 生詰, 生貯蔵, 2回火入れ などの加熱タイプ文字列 (または null)",
-  "is_genshu": 原酒である（加水無しの記述あり）なら 1, そうでないなら 0 (または null)",
-  "brewing_method": "生酛, 山廃, 木桶仕込み などの製造手法文字列 (または null)",
-  "serving_temperature": "冷酒, ぬる燗, 熱燗 などのおすすめ温度帯文字列 (または null)",
-  "confidence": 0.0〜1.0 の数値
-}}
-
-【検索情報】
-{search_text}'''
-        
-        response = client.models.generate_content(
-            model='gemini-3.6-flash',
-            contents=prompt
-        )
-        text = response.text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        text = text.strip()
-        return json.loads(text)
+        prompt = f'''以下の検索テキスト情報を元に、日本酒「{brand}」（製造蔵: {brewery}）の製品スペックを抽出し、純粋なJSONオブジェクトのみで返答してください。推測が含まれる場合は confidence を低く（0.5〜0.6）、確実な場合は高く（0.8〜0.9）設定してください。情報がない場合は null にしてください。余計な文章やマークダウンの囲みは一切含めず、純粋なJSON文字列だけを返してください。
+{{"category":null,"alcohol":null,"polish_ratio":null,"ingredients":null,"rice_variety":null,"yeast":null,"smv":null,"acidity":null,"amino_acidity":null,"heating_type":null,"is_genshu":null,"brewing_method":null,"serving_temperature":null,"confidence":0.0}}
+検索情報: {search_text}'''
+        return _call_gemini_rest(api_key, prompt)
     except Exception as e:
-        print(f"Gemini SDK実行エラー: {e}")
+        print(f"Gemini REST API実行エラー: {e}")
         return None
 
 def analyze_label_with_gemini(image_base64):
@@ -362,109 +349,23 @@ def analyze_label_with_gemini(image_base64):
     if not api_key:
         print("警告: GEMINI_API_KEY が設定されていません。")
         return None
-        
     try:
-        from google import genai
-        clean_key = api_key.strip().replace('"', '').replace("'", "")
-        client = genai.Client(api_key=clean_key)
-        
-        # Base64をパース
-        if "," in image_base64:
-            header, encoded = image_base64.split(",", 1)
-            mime_type = header.split(";")[0].split(":")[1]
-        else:
-            encoded = image_base64
-            mime_type = "image/jpeg"
-            
-        img_bytes = base64.b64decode(encoded)
-        
-        prompt = '''この日本酒の裏ラベル画像から、記載されている製品スペック（特定名称、アルコール度数、精米歩合、原材料、原料米、使用酵母、日本酒度、酸度、アミノ酸度、およびディープスペックとして火入れ回数/タイプ、原酒かどうか、仕込み方法、推奨飲用温度帯）をテキストOCRで読み取り、以下のキーを持つ純粋なJSONオブジェクトのみで返答してください。
-画像内に値が明記されていない、または読み取れない項目は絶対に推測せず、必ず null に設定してください。
-※余計な文章やマークダウンの ```json 等の囲みは一切含めず、純粋なJSON文字列だけを返してください。
-
-【出力キーと型】
-{
-  "category": "純米吟醸 などの特定名称文字列 (または null)",
-  "alcohol": 15.5 などの数値 (或者 null)",
-  "polish_ratio": "50% などの文字列 (または null)",
-  "ingredients": "米、米麹 などのカンマ区切り文字列 (または null)",
-  "rice_variety": "山田錦 などの使用米文字列 (または null)",
-  "yeast": "協会9号 などの使用酵母名 (または null)",
-  "smv": "+3.0 などの符号付き日本酒度 (または null)",
-  "acidity": "1.4 などの酸度数値文字列 (または null)",
-  "amino_acidity": "1.2 などのアミノ酸度数値文字列 (または null)",
-  "heating_type": "生酒, 生詰, 生貯蔵, 2回火入れ などの加熱タイプ文字列 (または null)",
-  "is_genshu": 原酒である（加水無しの記述あり）なら 1, そうでないなら 0 (または null)",
-  "brewing_method": "生酛, 山廃, 木桶仕込み などの製造手法文字列 (または null)",
-  "serving_temperature": "冷酒, ぬる燗, 熱燗 などのおすすめ温度帯文字列 (または null)"
-}'''
-        
-        response = client.models.generate_content(
-            model='gemini-3.6-flash',
-            contents=[
-                genai.types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
-                prompt
-            ]
-        )
-        text = response.text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        text = text.strip()
-        return json.loads(text)
+        prompt = '''この日本酒の裏ラベル画像から、記載されている製品スペックをテキストOCRで読み取り、純粋なJSONオブジェクトのみで返答してください。画像内に値が明記されていない項目は絶対に推測せず必ず null に設定してください。余計な文章やマークダウンの囲みは一切含めないでください。
+{"category":null,"alcohol":null,"polish_ratio":null,"ingredients":null,"rice_variety":null,"yeast":null,"smv":null,"acidity":null,"amino_acidity":null,"heating_type":null,"is_genshu":null,"brewing_method":null,"serving_temperature":null}'''
+        return _call_gemini_rest(api_key, prompt, image_base64)
     except Exception as e:
         print(f"GeminiマルチモーダルOCRエラー: {e}")
         return None
-
 
 def analyze_front_label_with_gemini(image_base64):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         print("警告: GEMINI_API_KEY が設定されていません。")
         return None
-        
     try:
-        from google import genai
-        clean_key = api_key.strip().replace('"', '').replace("'", "")
-        client = genai.Client(api_key=clean_key)
-        
-        # Base64をパース
-        if "," in image_base64:
-            header, encoded = image_base64.split(",", 1)
-            mime_type = header.split(";")[0].split(":")[1]
-        else:
-            encoded = image_base64
-            mime_type = "image/jpeg"
-            
-        img_bytes = base64.b64decode(encoded)
-        
-        prompt = '''この日本酒ボトルまたはラベル画像から、記載されている「銘柄名（商品ブランド名）」「酒蔵名（蔵元・醸造元）」「特定名称・種別（純米大吟醸、特別純米、スパークリング等）」およびその他特徴的なキーワードを読み取り、以下のキーを持つ純粋なJSONオブジェクトのみで返答してください。
-画像内に値が明記されていない、または判別できない項目は null に設定してください。
-※余計な文章やマークダウンの ```json 等の囲みは一切含めず、純粋なJSON文字列だけを返してください。
-
-【出力キーと型】
-{
-  "brand_name": "銘柄名（例: 獺祭, 新政, 八海山, 十四代 など）(または null)",
-  "brewery_name": "酒蔵名（例: 旭酒造, 新政酒造 など）(または null)",
-  "spec_name": "特定名称・スペック（例: 純米大吟醸 磨き三割九分 など）(または null)",
-  "keywords": ["ラベルに記載されているその他の特徴的単語の配列 (例: 山田錦, 生酒, 山口県 など)"]
-}'''
-        
-        response = client.models.generate_content(
-            model='gemini-3.6-flash',
-            contents=[
-                genai.types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
-                prompt
-            ]
-        )
-        text = response.text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        text = text.strip()
-        return json.loads(text)
+        prompt = '''この日本酒ボトルまたはラベル画像から、記載されている「銘柄名」「酒蔵名」「特定名称・種別」およびその他特徴的なキーワードを読み取り、純粋なJSONオブジェクトのみで返答してください。判別できない項目は null に設定してください。余計な文章やマークダウンの囲みは一切含めないでください。
+{"brand_name":null,"brewery_name":null,"spec_name":null,"keywords":[]}'''
+        return _call_gemini_rest(api_key, prompt, image_base64)
     except Exception as e:
         print(f"Gemini表ラベルOCR解析エラー: {e}")
         return None
@@ -770,25 +671,23 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             return
             
         elif self.path == "/api/debug-ai":
-            # 診断用エンドポイント: Gemini SDK/APIキーの状態を確認
+            # 診断用エンドポイント: REST API直接呼び出し方式の動作確認
             diag = {}
             try:
                 diag['api_key_set'] = bool(os.environ.get("GEMINI_API_KEY"))
                 diag['api_key_length'] = len(os.environ.get("GEMINI_API_KEY", ""))
             except:
                 diag['api_key_set'] = False
+            diag['method'] = 'REST API (no SDK required)'
             try:
-                from google import genai
-                diag['genai_import'] = 'OK'
-                diag['genai_version'] = getattr(genai, '__version__', 'unknown')
-            except Exception as e:
-                diag['genai_import'] = f'FAIL: {e}'
-            try:
-                from google import genai as g2
                 clean_key = os.environ.get("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
-                client = g2.Client(api_key=clean_key)
-                r = client.models.generate_content(model='gemini-3.6-flash', contents='Reply with just: OK')
-                diag['gemini_test'] = f'OK: {r.text.strip()[:50]}'
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={clean_key}"
+                payload = json.dumps({"contents": [{"parts": [{"text": "Reply with just: OK"}]}]})
+                req = urllib.request.Request(url, data=payload.encode('utf-8'), headers={'Content-Type': 'application/json'})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    result = json.loads(resp.read().decode('utf-8'))
+                reply = result['candidates'][0]['content']['parts'][0]['text'].strip()
+                diag['gemini_test'] = f'OK: {reply[:50]}'
             except Exception as e:
                 diag['gemini_test'] = f'FAIL: {e}'
             
