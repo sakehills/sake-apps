@@ -769,6 +769,36 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.end_headers()
             return
             
+        elif self.path == "/api/debug-ai":
+            # 診断用エンドポイント: Gemini SDK/APIキーの状態を確認
+            diag = {}
+            try:
+                diag['api_key_set'] = bool(os.environ.get("GEMINI_API_KEY"))
+                diag['api_key_length'] = len(os.environ.get("GEMINI_API_KEY", ""))
+            except:
+                diag['api_key_set'] = False
+            try:
+                from google import genai
+                diag['genai_import'] = 'OK'
+                diag['genai_version'] = getattr(genai, '__version__', 'unknown')
+            except Exception as e:
+                diag['genai_import'] = f'FAIL: {e}'
+            try:
+                from google import genai as g2
+                clean_key = os.environ.get("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
+                client = g2.Client(api_key=clean_key)
+                r = client.models.generate_content(model='gemini-3.6-flash', contents='Reply with just: OK')
+                diag['gemini_test'] = f'OK: {r.text.strip()[:50]}'
+            except Exception as e:
+                diag['gemini_test'] = f'FAIL: {e}'
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps(diag, ensure_ascii=False).encode('utf-8'))
+            return
+
         elif self.path == "/api/products" or self.path.startswith("/api/products?"):
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
