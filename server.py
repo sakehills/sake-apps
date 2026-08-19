@@ -489,9 +489,10 @@ def search_products_by_ai_label(conn, ai_data):
     if brand:
         query_parts.append("p.brand_name LIKE ?")
         params.append(f"%{brand}%")
-    if brewery:
+    brewery_clean = brewery.replace('株式会社', '').replace('株式會社', '').replace('有限会社', '').replace('合名会社', '').replace('合資会社', '').strip()
+    if brewery_clean:
         query_parts.append("p.brewery_name LIKE ? OR b.name LIKE ?")
-        params.extend([f"%{brewery}%", f"%{brewery}%"])
+        params.extend([f"%{brewery_clean}%", f"%{brewery_clean}%"])
     for kw in keywords:
         if isinstance(kw, str) and len(kw) >= 2 and kw not in (brand, brewery):
             query_parts.append("(p.brand_name LIKE ? OR p.spec_name LIKE ? OR p.brewery_name LIKE ?)")
@@ -534,10 +535,10 @@ def search_products_by_ai_label(conn, ai_data):
             elif brand in p_brand or p_brand in brand:
                 score += 35
         
-        if brewery:
-            if brewery == p_brewery:
+        if brewery_clean:
+            if brewery_clean == p_brewery:
                 score += 30
-            elif brewery in p_brewery or p_brewery in brewery:
+            elif brewery_clean in p_brewery or p_brewery in brewery_clean:
                 score += 20
                 
         if spec:
