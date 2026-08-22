@@ -200,8 +200,13 @@
     <!-- Tab 1: 酒蔵基本情報 -->
     <div id="infoTab" class="tab-content active">
         <div class="form-card">
-            <h3 style="margin-bottom: 1.5rem; color: #fff;">🏛️ 酒蔵プロフィールの編集</h3>
+            <h3 style="margin-bottom: 1.5rem; color: #fff; display: flex; align-items: center; justify-content: space-between;">
+                <span>🏛️ 酒蔵プロフィールの編集（公式一次情報）</span>
+                <span id="bShiniseBadge" style="font-size: 0.85rem; padding: 0.25rem 0.75rem; border-radius: 12px; background: rgba(212,175,55,0.2); color: var(--accent); border: 1px solid rgba(212,175,55,0.4); display: none;">👑 創業100年以上の老舗</span>
+            </h3>
             <form onsubmit="saveBreweryInfo(event)">
+                <!-- 基本情報 -->
+                <h4 style="color: var(--accent); margin: 1.2rem 0 0.8rem 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3rem;">📋 1. 基本情報・代表者</h4>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label>酒蔵名 (法人名)</label>
@@ -224,24 +229,150 @@
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>代表電話番号 (TEL)</label>
+                        <input type="text" id="bPhone" class="form-control" placeholder="例: 0827-86-0120">
+                    </div>
+                    <div class="form-group">
+                        <label>FAX番号</label>
+                        <input type="text" id="bFax" class="form-control" placeholder="例: 0827-86-0071">
+                    </div>
+                    <div class="form-group">
+                        <label>代表者・蔵元当主名</label>
+                        <input type="text" id="bPresident" class="form-control" placeholder="例: 桜井 一宏">
+                    </div>
+                    <div class="form-group">
+                        <label>現役杜氏・製造責任者名</label>
+                        <input type="text" id="bTojiName" class="form-control" placeholder="例: 社員醸造体制">
+                    </div>
+                </div>
+
+                <!-- 創業・水質・杜氏流派 -->
+                <h4 style="color: var(--accent); margin: 1.5rem 0 0.8rem 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3rem;">💧 2. 歴史・仕込み水・杜氏流派</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label>創業年 (西暦)</label>
-                        <input type="number" id="bFounded" class="form-control" placeholder="例: 1948">
+                        <input type="number" id="bFounded" class="form-control" placeholder="例: 1948" onchange="autoCalcEra()">
                     </div>
+                    <div class="form-group">
+                        <label>創業元号</label>
+                        <input type="text" id="bFoundedEra" class="form-control" placeholder="例: 昭和23年">
+                    </div>
+                    <div class="form-group">
+                        <label>時代区分</label>
+                        <input type="text" id="bEraCategory" class="form-control" placeholder="例: 昭和">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>仕込み水・水系・湧水名</label>
+                        <input type="text" id="bWaterSource" class="form-control" placeholder="例: 寂地山系地下伏流水">
+                    </div>
+                    <div class="form-group">
+                        <label>水質硬度区分</label>
+                        <select id="bWaterHardness" class="form-control">
+                            <option value="超軟水">超軟水 (0-30mg/L)</option>
+                            <option value="軟水">軟水 (30-60mg/L)</option>
+                            <option value="中軟水">中軟水 (60-90mg/L)</option>
+                            <option value="中硬水">中硬水 (90-120mg/L)</option>
+                            <option value="硬水">硬水 (120mg/L以上)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>杜氏流派・醸造体制</label>
+                        <input type="text" id="bTojiGuild" class="form-control" placeholder="例: 社員醸造 / 丹波杜氏">
+                    </div>
+                </div>
+
+                <!-- 観光・店舗案内 -->
+                <h4 style="color: var(--accent); margin: 1.5rem 0 0.8rem 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3rem;">🏪 3. 直売所・観光・見学案内</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>直売所営業時間</label>
+                        <input type="text" id="bOpeningHours" class="form-control" placeholder="例: 09:00〜17:00">
+                    </div>
+                    <div class="form-group">
+                        <label>定休日</label>
+                        <input type="text" id="bRegularHoliday" class="form-control" placeholder="例: 年中無休 / 日・祝日">
+                    </div>
+                    <div class="form-group">
+                        <label>駐車場情報</label>
+                        <input type="text" id="bParking" class="form-control" placeholder="例: あり (15台・無料)">
+                    </div>
+                    <div class="form-group">
+                        <label>酒蔵見学詳細</label>
+                        <input type="text" id="bTourInfo" class="form-control" placeholder="例: 本社蔵見学可 (要予約)">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; align-items: center;">
+                    <div class="form-group">
+                        <label>交通アクセス</label>
+                        <input type="text" id="bAccess" class="form-control" placeholder="例: JR周防高森駅よりタクシーで約15分">
+                    </div>
+                    <div class="form-group" style="padding-top: 1.2rem;">
+                        <label style="cursor: pointer;"><input type="checkbox" id="bHasTasting"> 🍶 試飲・角打ちあり</label>
+                    </div>
+                    <div class="form-group" style="padding-top: 1.2rem;">
+                        <label style="cursor: pointer;"><input type="checkbox" id="bHasCafe"> ☕ カフェ・食事あり</label>
+                    </div>
+                    <div class="form-group" style="padding-top: 1.2rem;">
+                        <label style="cursor: pointer;"><input type="checkbox" id="bIsCultural"> 🏛️ 有形文化財指定</label>
+                    </div>
+                </div>
+
+                <!-- 公式リンク & こだわり -->
+                <h4 style="color: var(--accent); margin: 1.5rem 0 0.8rem 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3rem;">🌐 4. 公式Web / SNS / こだわり酒米</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div class="form-group">
                         <label>公式WebサイトURL</label>
                         <input type="url" id="bWebsite" class="form-control" placeholder="https://www.dassai.co.jp">
                     </div>
+                    <div class="form-group">
+                        <label>公式オンラインショップURL</label>
+                        <input type="url" id="bOfficialEc" class="form-control" placeholder="https://www.dassai-store.com">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>公式 Instagram URL</label>
+                        <input type="url" id="bInstagram" class="form-control" placeholder="https://www.instagram.com/...">
+                    </div>
+                    <div class="form-group">
+                        <label>公式 Facebook URL</label>
+                        <input type="url" id="bFacebook" class="form-control" placeholder="https://www.facebook.com/...">
+                    </div>
+                    <div class="form-group">
+                        <label>公式 X (Twitter) URL</label>
+                        <input type="url" id="bTwitter" class="form-control" placeholder="https://x.com/...">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>主な使用酒米・こだわり</label>
+                        <input type="text" id="bMainRice" class="form-control" placeholder="例: 山田錦・雄町・自社栽培米">
+                    </div>
+                    <div class="form-group">
+                        <label>醸造・酒造りの特徴</label>
+                        <input type="text" id="bBrewingFeatures" class="form-control" placeholder="例: 全量純米大吟醸・四季醸造・氷温貯蔵">
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label>酒蔵の歴史・特徴・酒造りのこだわり</label>
+                    <label>酒蔵の歴史・酒造りのこだわり・メッセージ</label>
                     <textarea id="bDesc" class="form-control" rows="4" placeholder="酒造りのこだわりや伝統、酒蔵の歴史をご記入ください..."></textarea>
                 </div>
 
-                <div id="infoMsg" style="margin-bottom: 1rem; color: var(--success); display: none;"></div>
-                <button type="submit" class="btn-submit">💾 酒蔵情報を保存する</button>
+                <div class="form-group" style="font-size: 0.8rem; color: var(--text-muted);">
+                    一次情報出典元: <span id="bInfoSource" style="color: var(--accent);">公式ホームページ・国税庁照合</span>
+                </div>
+
+                <div id="infoMsg" style="margin-bottom: 1rem; color: var(--success); display: none; font-weight: 600;"></div>
+                <button type="submit" class="btn-submit">💾 酒蔵情報を一括保存する</button>
             </form>
         </div>
     </div>
@@ -407,21 +538,76 @@ function switchTab(tabId, btn) {
     btn.classList.add('active');
 }
 
+function autoCalcEra() {
+    const yVal = parseInt(document.getElementById('bFounded').value);
+    if (!yVal || isNaN(yVal)) return;
+    const isShinise = (2026 - yVal) >= 100;
+    const badge = document.getElementById('bShiniseBadge');
+    if (badge) badge.style.display = isShinise ? 'inline-block' : 'none';
+
+    let era = '', cat = '';
+    if (yVal >= 2019) { era = (yVal === 2019 ? '令和元年' : `令和${yVal-2018}年`); cat = '令和'; }
+    else if (yVal >= 1989) { era = (yVal === 1989 ? '平成元年' : `平成${yVal-1988}年`); cat = '平成'; }
+    else if (yVal >= 1926) { era = (yVal === 1926 ? '昭和元年' : `昭和${yVal-1925}年`); cat = '昭和'; }
+    else if (yVal >= 1912) { era = (yVal === 1912 ? '大正元年' : `大正${yVal-1911}年`); cat = '大正'; }
+    else if (yVal >= 1868) { era = (yVal === 1868 ? '明治元年' : `明治${yVal-1867}年`); cat = '明治'; }
+    else if (yVal >= 1854) { era = '安政年間'; cat = '江戸後期・幕末'; }
+    else if (yVal >= 1751) { era = '江戸宝暦・天明年間'; cat = '江戸中期'; }
+    else if (yVal >= 1603) { era = '江戸前期・寛永年間'; cat = '江戸前期'; }
+    else { era = `${yVal}年`; cat = '安土桃山・室町以前'; }
+
+    if (!document.getElementById('bFoundedEra').value) document.getElementById('bFoundedEra').value = era;
+    if (!document.getElementById('bEraCategory').value) document.getElementById('bEraCategory').value = cat;
+}
+
 async function loadBreweryInfo() {
     try {
         const res = await fetch(`/api/brewery?name=${encodeURIComponent(currentBreweryName)}`);
         if (res.ok) {
             const data = await res.json();
-            if (data) {
+            if (data && !data.error) {
                 document.getElementById('bKuraName').value = data.kura_name || '';
                 document.getElementById('bPrefecture').value = data.prefecture || '';
                 document.getElementById('bAddress').value = data.address || '';
+                document.getElementById('bPhone').value = data.phone || '';
+                document.getElementById('bFax').value = data.fax || '';
+                document.getElementById('bPresident').value = data.president_name || '';
+                document.getElementById('bTojiName').value = data.toji_name || '';
+
                 document.getElementById('bFounded').value = data.founded_year || '';
+                document.getElementById('bFoundedEra').value = data.founded_era || '';
+                document.getElementById('bEraCategory').value = data.era_category || '';
+                document.getElementById('bWaterSource').value = data.water_source_name || '';
+                if (data.water_hardness_type) document.getElementById('bWaterHardness').value = data.water_hardness_type;
+                document.getElementById('bTojiGuild').value = data.toji_guild || '';
+
+                document.getElementById('bOpeningHours').value = data.opening_hours || '';
+                document.getElementById('bRegularHoliday').value = data.regular_holiday || '';
+                document.getElementById('bParking').value = data.parking_info || '';
+                document.getElementById('bTourInfo').value = data.tour_info || '';
+                document.getElementById('bAccess').value = data.access_info || '';
+                document.getElementById('bHasTasting').checked = data.has_tasting == 1;
+                document.getElementById('bHasCafe').checked = data.has_cafe_restaurant == 1;
+                document.getElementById('bIsCultural').checked = data.is_cultural_property == 1;
+
                 document.getElementById('bWebsite').value = data.website || '';
+                document.getElementById('bOfficialEc').value = data.official_ec_url || '';
+                document.getElementById('bInstagram').value = data.sns_instagram || '';
+                document.getElementById('bFacebook').value = data.sns_facebook || '';
+                document.getElementById('bTwitter').value = data.sns_twitter || '';
+                document.getElementById('bMainRice').value = data.main_rice_varieties || '';
+                document.getElementById('bBrewingFeatures').value = data.brewing_features || '';
                 document.getElementById('bDesc').value = data.description || '';
+                document.getElementById('bInfoSource').innerText = data.info_source_url || '公式HP / 国税庁';
+
+                if (data.is_shinise == 1) {
+                    document.getElementById('bShiniseBadge').style.display = 'inline-block';
+                }
             }
         }
-    } catch(e){}
+    } catch(e){
+        console.error("loadBreweryInfo error", e);
+    }
 }
 
 async function saveBreweryInfo(e) {
@@ -434,8 +620,35 @@ async function saveBreweryInfo(e) {
         kura_name: document.getElementById('bKuraName').value,
         prefecture: document.getElementById('bPrefecture').value,
         address: document.getElementById('bAddress').value,
-        founded_year: document.getElementById('bFounded').value ? parseInt(document.getElementById('bFounded').value) : None,
+        phone: document.getElementById('bPhone').value,
+        fax: document.getElementById('bFax').value,
+        president_name: document.getElementById('bPresident').value,
+        toji_name: document.getElementById('bTojiName').value,
+
+        founded_year: document.getElementById('bFounded').value ? parseInt(document.getElementById('bFounded').value) : null,
+        founded_era: document.getElementById('bFoundedEra').value,
+        era_category: document.getElementById('bEraCategory').value,
+        is_shinise: document.getElementById('bFounded').value && (2026 - parseInt(document.getElementById('bFounded').value) >= 100) ? 1 : 0,
+        water_source_name: document.getElementById('bWaterSource').value,
+        water_hardness_type: document.getElementById('bWaterHardness').value,
+        toji_guild: document.getElementById('bTojiGuild').value,
+
+        opening_hours: document.getElementById('bOpeningHours').value,
+        regular_holiday: document.getElementById('bRegularHoliday').value,
+        parking_info: document.getElementById('bParking').value,
+        tour_info: document.getElementById('bTourInfo').value,
+        access_info: document.getElementById('bAccess').value,
+        has_tasting: document.getElementById('bHasTasting').checked ? 1 : 0,
+        has_cafe_restaurant: document.getElementById('bHasCafe').checked ? 1 : 0,
+        is_cultural_property: document.getElementById('bIsCultural').checked ? 1 : 0,
+
         website: document.getElementById('bWebsite').value,
+        official_ec_url: document.getElementById('bOfficialEc').value,
+        sns_instagram: document.getElementById('bInstagram').value,
+        sns_facebook: document.getElementById('bFacebook').value,
+        sns_twitter: document.getElementById('bTwitter').value,
+        main_rice_varieties: document.getElementById('bMainRice').value,
+        brewing_features: document.getElementById('bBrewingFeatures').value,
         description: document.getElementById('bDesc').value
     };
 
@@ -446,12 +659,15 @@ async function saveBreweryInfo(e) {
             body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (res.ok) {
-            msg.innerText = '✅ 酒蔵の基本情報を正常に更新・保存しました！';
+        if (res.ok && data.status === 'success') {
+            msg.innerText = '✅ 酒蔵の公式一次情報を正常に更新・保存しました！';
             msg.style.display = 'block';
+            autoCalcEra();
+        } else {
+            alert('保存エラー: ' + (data.message || '不明なエラー'));
         }
     } catch(e) {
-        alert('保存エラーが発生しました');
+        alert('保存通信エラーが発生しました');
     }
 }
 

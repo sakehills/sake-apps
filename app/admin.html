@@ -476,6 +476,7 @@ document.addEventListener('DOMContentLoaded', initAuth);
     <div class="container">
         <div class="tab-nav">
             <button class="tab-btn active" onclick="switchTab('tab-gen', event)">✨ AI口コミ＆2枚写真自動生成</button>
+            <button class="tab-btn" onclick="switchTab('tab-breweries', event)">🏛️ 全国酒蔵マスター管理 (1,629蔵)</button>
             <button class="tab-btn" onclick="switchTab('tab-csv', event)">📥 スペックCSVインポート</button>
             <button class="tab-btn" onclick="switchTab('tab-profiles', event)">👤 ペルソナ・プロフィール管理</button>
         </div>
@@ -533,6 +534,156 @@ document.addEventListener('DOMContentLoaded', initAuth);
                     <div style="font-weight: 700; color: var(--accent-gold); margin-bottom: 0.6rem; font-size: 1.05rem;">🎉 口コミの自動生成が完了しました！</div>
                     <div id="resultDetails" style="font-size: 0.9rem; line-height: 1.6;"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- TAB: 全国酒蔵マスター管理 (1,629蔵) -->
+        <div id="tab-breweries" class="tab-content">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <div class="card-title" style="margin-bottom: 0.3rem;">🏛️ 全国酒蔵マスター管理（公式一次情報・全1,629蔵）</div>
+                        <div style="color: var(--text-muted); font-size: 0.85rem;">
+                            創業元号・仕込み水・杜氏流派・営業時間・代表者・公式EC/SNS等の一次情報を検索・直接編集できます。
+                        </div>
+                    </div>
+                    <button onclick="openAdminBreweryModal(null)" class="btn-primary" style="padding: 0.5rem 1.2rem; font-size: 0.85rem;">➕ 新規酒蔵を登録</button>
+                </div>
+
+                <!-- 検索・フィルターバー -->
+                <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <input type="text" id="adminBrewerySearch" class="form-input" placeholder="酒蔵名・代表者・杜氏名・キーワードで検索..." onkeyup="if(event.key==='Enter') searchAdminBreweries()">
+                    <select id="adminBreweryPrefFilter" class="form-select" onchange="searchAdminBreweries()">
+                        <option value="">都道府県すべて</option>
+                        <option value="北海道">北海道</option><option value="青森県">青森県</option><option value="岩手県">岩手県</option>
+                        <option value="宮城県">宮城県</option><option value="秋田県">秋田県</option><option value="山形県">山形県</option>
+                        <option value="福島県">福島県</option><option value="茨城県">茨城県</option><option value="栃木県">栃木県</option>
+                        <option value="群馬県">群馬県</option><option value="埼玉県">埼玉県</option><option value="千葉県">千葉県</option>
+                        <option value="東京都">東京都</option><option value="神奈川県">神奈川県</option><option value="新潟県">新潟県</option>
+                        <option value="富山県">富山県</option><option value="石川県">石川県</option><option value="福井県">福井県</option>
+                        <option value="山梨県">山梨県</option><option value="長野県">長野県</option><option value="岐阜県">岐阜県</option>
+                        <option value="静岡県">静岡県</option><option value="愛知県">愛知県</option><option value="三重県">三重県</option>
+                        <option value="滋賀県">滋賀県</option><option value="京都府">京都府</option><option value="大阪府">大阪府</option>
+                        <option value="兵庫県">兵庫県</option><option value="奈良県">奈良県</option><option value="和歌山県">和歌山県</option>
+                        <option value="鳥取県">鳥取県</option><option value="島根県">島根県</option><option value="岡山県">岡山県</option>
+                        <option value="広島県">広島県</option><option value="山口県">山口県</option><option value="徳島県">徳島県</option>
+                        <option value="香川県">香川県</option><option value="愛媛県">愛媛県</option><option value="高知県">高知県</option>
+                        <option value="福岡県">福岡県</option><option value="佐賀県">佐賀県</option><option value="長崎県">長崎県</option>
+                        <option value="熊本県">熊本県</option><option value="大分県">大分県</option><option value="宮崎県">宮崎県</option>
+                        <option value="鹿児島県">鹿児島県</option><option value="沖縄県">沖縄県</option>
+                    </select>
+                    <button onclick="searchAdminBreweries()" class="btn-primary" style="padding: 0.6rem 1.4rem;">🔍 検索</button>
+                </div>
+
+                <div id="adminBreweryCount" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;"></div>
+
+                <!-- 酒蔵一覧テーブル -->
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); text-align: left;">
+                                <th style="padding: 0.75rem 0.5rem;">ID</th>
+                                <th style="padding: 0.75rem 0.5rem;">酒蔵名 / 所在地</th>
+                                <th style="padding: 0.75rem 0.5rem;">創業 / 元号 / 歴史</th>
+                                <th style="padding: 0.75rem 0.5rem;">代表者 / 杜氏</th>
+                                <th style="padding: 0.75rem 0.5rem;">仕込み水 / 硬度 / 流派</th>
+                                <th style="padding: 0.75rem 0.5rem;">直売所・見学・公式リンク</th>
+                                <th style="padding: 0.75rem 0.5rem; text-align: center;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminBreweryTableBody">
+                            <tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">酒蔵データを読み込み中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🏛️ 酒蔵詳細編集モーダル -->
+        <div id="adminBreweryModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 2100; align-items: center; justify-content: center; padding: 1rem;">
+            <div style="background: var(--bg-card); border: 1px solid rgba(212,175,55,0.4); border-radius: 16px; max-width: 900px; width: 100%; padding: 2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.8); max-height: 90vh; overflow-y: auto; color: var(--text-main);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.8rem;">
+                    <h3 id="adminBModalTitle" style="color: var(--accent-gold); font-size: 1.3rem; font-weight: 700;">✏️ 酒蔵情報の編集</h3>
+                    <button onclick="closeAdminBreweryModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.6rem; cursor: pointer;">&times;</button>
+                </div>
+                <form id="adminBreweryForm" onsubmit="saveAdminBreweryForm(event)">
+                    <input type="hidden" id="abId">
+                    
+                    <h4 style="color: var(--accent-gold); margin-bottom: 0.6rem;">📋 1. 基本情報</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.8rem;">
+                        <div><label class="form-label">酒蔵名 (必須)</label><input type="text" id="abName" class="form-input" required></div>
+                        <div><label class="form-label">屋号・蔵名</label><input type="text" id="abKuraName" class="form-input"></div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 0.75rem; margin-bottom: 0.8rem;">
+                        <div><label class="form-label">都道府県</label><input type="text" id="abPref" class="form-input"></div>
+                        <div><label class="form-label">市区町村</label><input type="text" id="abCity" class="form-input"></div>
+                        <div><label class="form-label">住所</label><input type="text" id="abAddr" class="form-input"></div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                        <div><label class="form-label">代表電話番号</label><input type="text" id="abPhone" class="form-input"></div>
+                        <div><label class="form-label">FAX番号</label><input type="text" id="abFax" class="form-input"></div>
+                        <div><label class="form-label">代表者名</label><input type="text" id="abPresident" class="form-input"></div>
+                        <div><label class="form-label">杜氏名</label><input type="text" id="abTojiName" class="form-input"></div>
+                    </div>
+
+                    <h4 style="color: var(--accent-gold); margin-bottom: 0.6rem;">💧 2. 歴史・水質・杜氏流派</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 0.8rem;">
+                        <div><label class="form-label">創業年 (西暦)</label><input type="number" id="abFounded" class="form-input"></div>
+                        <div><label class="form-label">創業元号</label><input type="text" id="abEra" class="form-input"></div>
+                        <div><label class="form-label">時代区分</label><input type="text" id="abEraCat" class="form-input"></div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                        <div><label class="form-label">仕込み水・水系名</label><input type="text" id="abWater" class="form-input"></div>
+                        <div>
+                            <label class="form-label">水質硬度区分</label>
+                            <select id="abHardness" class="form-select">
+                                <option value="超軟水">超軟水</option><option value="軟水">軟水</option>
+                                <option value="中軟水">中軟水</option><option value="中硬水">中硬水</option><option value="硬水">硬水</option>
+                            </select>
+                        </div>
+                        <div><label class="form-label">杜氏流派</label><input type="text" id="abTojiGuild" class="form-input"></div>
+                    </div>
+
+                    <h4 style="color: var(--accent-gold); margin-bottom: 0.6rem;">🏪 3. 直売所・観光・見学案内</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 0.8rem;">
+                        <div><label class="form-label">営業時間</label><input type="text" id="abHours" class="form-input"></div>
+                        <div><label class="form-label">定休日</label><input type="text" id="abHol" class="form-input"></div>
+                        <div><label class="form-label">駐車場</label><input type="text" id="abParking" class="form-input"></div>
+                        <div><label class="form-label">見学案内</label><input type="text" id="abTour" class="form-input"></div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; align-items: center;">
+                        <div><label class="form-label">交通アクセス</label><input type="text" id="abAccess" class="form-input"></div>
+                        <div style="padding-top: 1.2rem;"><label style="cursor: pointer;"><input type="checkbox" id="abHasTasting"> 試飲あり</label></div>
+                        <div style="padding-top: 1.2rem;"><label style="cursor: pointer;"><input type="checkbox" id="abHasCafe"> カフェあり</label></div>
+                        <div style="padding-top: 1.2rem;"><label style="cursor: pointer;"><input type="checkbox" id="abIsCultural"> 文化財指定</label></div>
+                    </div>
+
+                    <h4 style="color: var(--accent-gold); margin-bottom: 0.6rem;">🌐 4. 公式リンク & こだわり</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.8rem;">
+                        <div><label class="form-label">公式WebサイトURL</label><input type="url" id="abWebsite" class="form-input"></div>
+                        <div><label class="form-label">公式オンラインショップURL</label><input type="url" id="abEc" class="form-input"></div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 0.8rem;">
+                        <div><label class="form-label">公式Instagram</label><input type="url" id="abInsta" class="form-input"></div>
+                        <div><label class="form-label">公式Facebook</label><input type="url" id="abFb" class="form-input"></div>
+                        <div><label class="form-label">公式Twitter (X)</label><input type="url" id="abTw" class="form-input"></div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.8rem;">
+                        <div><label class="form-label">主な使用酒米</label><input type="text" id="abRice" class="form-input"></div>
+                        <div><label class="form-label">醸造特徴</label><input type="text" id="abBrew" class="form-input"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">歴史・こだわり説明文</label>
+                        <textarea id="abDesc" class="form-textarea" rows="3"></textarea>
+                    </div>
+
+                    <div id="abMsg" style="color: var(--accent-emerald); font-weight: 700; margin-bottom: 1rem; display: none;"></div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+                        <button type="button" onclick="closeAdminBreweryModal()" style="background: none; border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;">キャンセル</button>
+                        <button type="submit" class="btn-primary">💾 保存する</button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -890,6 +1041,205 @@ document.addEventListener('DOMContentLoaded', initAuth);
                 }
             });
         });
+        // 🏛️ 酒蔵マスター管理 JS
+        let adminBreweriesData = [];
+
+        async function loadAdminBreweries(q = '', pref = '') {
+            const tbody = document.getElementById('adminBreweryTableBody');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">読み込み中...</td></tr>';
+            try {
+                let url = `/api/admin/breweries?limit=150`;
+                if (q) url += `&q=${encodeURIComponent(q)}`;
+                if (pref) url += `&prefecture=${encodeURIComponent(pref)}`;
+
+                const res = await fetch(url);
+                const data = await res.json();
+                adminBreweriesData = data.breweries || [];
+
+                document.getElementById('adminBreweryCount').innerText = `全 ${data.total || 0} 件中 ${adminBreweriesData.length} 件を表示`;
+
+                if (adminBreweriesData.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">該当する酒蔵が見つかりませんでした</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = adminBreweriesData.map(b => `
+                    <tr style="border-bottom: 1px solid var(--border-color);">
+                        <td style="padding: 0.8rem 0.5rem; color: var(--text-muted); font-size: 0.8rem;">#${b.id}</td>
+                        <td style="padding: 0.8rem 0.5rem;">
+                            <strong style="color: #fff; font-size: 0.95rem;">${b.name}</strong>
+                            ${b.kura_name ? `<br><small style="color: var(--accent-gold);">${b.kura_name}</small>` : ''}
+                            <br><small style="color: var(--text-muted);">📍 ${b.prefecture || ''} ${b.city || ''}</small>
+                        </td>
+                        <td style="padding: 0.8rem 0.5rem;">
+                            ${b.founded_year ? `<span>${b.founded_year}年</span>` : '<span style="color: var(--text-muted);">-</span>'}
+                            ${b.founded_era ? `<br><small style="color: var(--text-muted);">${b.founded_era}</small>` : ''}
+                            ${b.is_shinise == 1 ? `<br><span style="background: rgba(212,175,55,0.2); color: var(--accent-gold); font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 4px;">老舗</span>` : ''}
+                        </td>
+                        <td style="padding: 0.8rem 0.5rem;">
+                            ${b.president_name ? `<div>👤 ${b.president_name}</div>` : '<div style="color: var(--text-muted);">-</div>'}
+                            ${b.toji_name ? `<small style="color: var(--text-muted);">🍶 ${b.toji_name}</small>` : ''}
+                        </td>
+                        <td style="padding: 0.8rem 0.5rem;">
+                            ${b.water_source_name ? `<div style="color: #93c5fd; font-size: 0.82rem;">💧 ${b.water_source_name}</div>` : ''}
+                            ${b.water_hardness_type ? `<span style="font-size: 0.75rem; background: rgba(59,130,246,0.15); color: #93c5fd; padding: 0.1rem 0.35rem; border-radius: 4px;">${b.water_hardness_type}</span> ` : ''}
+                            ${b.toji_guild ? `<span style="font-size: 0.75rem; background: rgba(16,185,129,0.15); color: #6ee7b7; padding: 0.1rem 0.35rem; border-radius: 4px;">${b.toji_guild}</span>` : ''}
+                        </td>
+                        <td style="padding: 0.8rem 0.5rem; font-size: 0.8rem;">
+                            ${b.opening_hours ? `<div>🕒 ${b.opening_hours}</div>` : ''}
+                            ${b.phone ? `<div>📞 ${b.phone}</div>` : ''}
+                            <div style="display: flex; gap: 4px; margin-top: 4px;">
+                                ${b.website ? `<a href="${b.website}" target="_blank" style="color: var(--accent-gold); text-decoration: none;">🌐 HP</a>` : ''}
+                                ${b.official_ec_url ? `<a href="${b.official_ec_url}" target="_blank" style="color: #10b981; text-decoration: none;">🛒 EC</a>` : ''}
+                                ${b.sns_instagram ? `<a href="${b.sns_instagram}" target="_blank" style="color: #ec4899; text-decoration: none;">📷 Insta</a>` : ''}
+                            </div>
+                        </td>
+                        <td style="padding: 0.8rem 0.5rem; text-align: center;">
+                            <button onclick='openAdminBreweryModal(${JSON.stringify(b)})' style="background: rgba(212,175,55,0.15); color: var(--accent-gold); border: 1px solid rgba(212,175,55,0.4); padding: 0.4rem 0.8rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">✏️ 編集</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 2rem;">読み込みエラーが発生しました</td></tr>';
+            }
+        }
+
+        function searchAdminBreweries() {
+            const q = document.getElementById('adminBrewerySearch').value;
+            const pref = document.getElementById('adminBreweryPrefFilter').value;
+            loadAdminBreweries(q, pref);
+        }
+
+        function openAdminBreweryModal(b = null) {
+            document.getElementById('adminBreweryModal').style.display = 'flex';
+            document.getElementById('abMsg').style.display = 'none';
+            if (b) {
+                document.getElementById('adminBModalTitle').innerText = `✏️ 酒蔵情報の編集: ${b.name}`;
+                document.getElementById('abId').value = b.id;
+                document.getElementById('abName').value = b.name || '';
+                document.getElementById('abKuraName').value = b.kura_name || '';
+                document.getElementById('abPref').value = b.prefecture || '';
+                document.getElementById('abCity').value = b.city || '';
+                document.getElementById('abAddr').value = b.address || '';
+                document.getElementById('abPhone').value = b.phone || '';
+                document.getElementById('abFax').value = b.fax || '';
+                document.getElementById('abPresident').value = b.president_name || '';
+                document.getElementById('abTojiName').value = b.toji_name || '';
+
+                document.getElementById('abFounded').value = b.founded_year || '';
+                document.getElementById('abEra').value = b.founded_era || '';
+                document.getElementById('abEraCat').value = b.era_category || '';
+                document.getElementById('abWater').value = b.water_source_name || '';
+                if (b.water_hardness_type) document.getElementById('abHardness').value = b.water_hardness_type;
+                document.getElementById('abTojiGuild').value = b.toji_guild || '';
+
+                document.getElementById('abHours').value = b.opening_hours || '';
+                document.getElementById('abHol').value = b.regular_holiday || '';
+                document.getElementById('abParking').value = b.parking_info || '';
+                document.getElementById('abTour').value = b.tour_info || '';
+                document.getElementById('abAccess').value = b.access_info || '';
+                document.getElementById('abHasTasting').checked = b.has_tasting == 1;
+                document.getElementById('abHasCafe').checked = b.has_cafe_restaurant == 1;
+                document.getElementById('abIsCultural').checked = b.is_cultural_property == 1;
+
+                document.getElementById('abWebsite').value = b.website || '';
+                document.getElementById('abEc').value = b.official_ec_url || '';
+                document.getElementById('abInsta').value = b.sns_instagram || '';
+                document.getElementById('abFb').value = b.sns_facebook || '';
+                document.getElementById('abTw').value = b.sns_twitter || '';
+                document.getElementById('abRice').value = b.main_rice_varieties || '';
+                document.getElementById('abBrew').value = b.brewing_features || '';
+                document.getElementById('abDesc').value = b.description || '';
+            } else {
+                document.getElementById('adminBModalTitle').innerText = '➕ 新規酒蔵の登録';
+                document.getElementById('adminBreweryForm').reset();
+                document.getElementById('abId').value = '';
+            }
+        }
+
+        function closeAdminBreweryModal() {
+            document.getElementById('adminBreweryModal').style.display = 'none';
+        }
+
+        async function saveAdminBreweryForm(e) {
+            e.preventDefault();
+            const msg = document.getElementById('abMsg');
+            msg.style.display = 'none';
+
+            const payload = {
+                id: document.getElementById('abId').value ? parseInt(document.getElementById('abId').value) : null,
+                name: document.getElementById('abName').value,
+                kura_name: document.getElementById('abKuraName').value,
+                prefecture: document.getElementById('abPref').value,
+                city: document.getElementById('abCity').value,
+                address: document.getElementById('abAddr').value,
+                phone: document.getElementById('abPhone').value,
+                fax: document.getElementById('abFax').value,
+                president_name: document.getElementById('abPresident').value,
+                toji_name: document.getElementById('abTojiName').value,
+
+                founded_year: document.getElementById('abFounded').value ? parseInt(document.getElementById('abFounded').value) : null,
+                founded_era: document.getElementById('abEra').value,
+                era_category: document.getElementById('abEraCat').value,
+                is_shinise: document.getElementById('abFounded').value && (2026 - parseInt(document.getElementById('abFounded').value) >= 100) ? 1 : 0,
+                water_source_name: document.getElementById('abWater').value,
+                water_hardness_type: document.getElementById('abHardness').value,
+                toji_guild: document.getElementById('abTojiGuild').value,
+
+                opening_hours: document.getElementById('abHours').value,
+                regular_holiday: document.getElementById('abHol').value,
+                parking_info: document.getElementById('abParking').value,
+                tour_info: document.getElementById('abTour').value,
+                access_info: document.getElementById('abAccess').value,
+                has_tasting: document.getElementById('abHasTasting').checked ? 1 : 0,
+                has_cafe_restaurant: document.getElementById('abHasCafe').checked ? 1 : 0,
+                is_cultural_property: document.getElementById('abIsCultural').checked ? 1 : 0,
+
+                website: document.getElementById('abWebsite').value,
+                official_ec_url: document.getElementById('abEc').value,
+                sns_instagram: document.getElementById('abInsta').value,
+                sns_facebook: document.getElementById('abFb').value,
+                sns_twitter: document.getElementById('abTw').value,
+                main_rice_varieties: document.getElementById('abRice').value,
+                brewing_features: document.getElementById('abBrew').value,
+                description: document.getElementById('abDesc').value
+            };
+
+            try {
+                const res = await fetch('/api/admin/brewery/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    msg.innerText = '✅ 酒蔵情報を正常に保存しました！';
+                    msg.style.display = 'block';
+                    setTimeout(() => {
+                        closeAdminBreweryModal();
+                        searchAdminBreweries();
+                    }, 800);
+                } else {
+                    alert('保存エラー: ' + (data.message || '不明なエラー'));
+                }
+            } catch(e) {
+                alert('通信エラーが発生しました');
+            }
+        }
+
+        // タブ切り替え時のハンドラー拡張
+        const originalSwitchTab = window.switchTab;
+        window.switchTab = function(tabId, event) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            if (event && event.target) event.target.classList.add('active');
+            const targetEl = document.getElementById(tabId);
+            if (targetEl) targetEl.classList.add('active');
+
+            if (tabId === 'tab-breweries') {
+                loadAdminBreweries();
+            }
+        };
     </script>
 
 <script>

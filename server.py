@@ -1161,15 +1161,61 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
 
+        elif self.path.startswith("/api/admin/breweries"):
+            parsed_url = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed_url.query)
+            q = params.get('q', [''])[0].strip()
+            pref = params.get('prefecture', [''])[0].strip()
+            limit = int(params.get('limit', [100])[0])
+            offset = int(params.get('offset', [0])[0])
+
+            conn = None
+            try:
+                conn = sqlite3.connect(DB_PATH)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                where_clauses = []
+                args = []
+                if q:
+                    where_clauses.append("(name LIKE ? OR name_norm LIKE ? OR kura_name LIKE ? OR president_name LIKE ? OR toji_name LIKE ?)")
+                    like_q = f"%{q}%"
+                    args.extend([like_q, like_q, like_q, like_q, like_q])
+                if pref:
+                    where_clauses.append("prefecture = ?")
+                    args.append(pref)
+
+                where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+                cursor.execute(f"SELECT COUNT(*) FROM breweries {where_str}", args)
+                total_count = cursor.fetchone()[0]
+
+                cursor.execute(f"SELECT * FROM breweries {where_str} ORDER BY id ASC LIMIT ? OFFSET ?", args + [limit, offset])
+                rows = cursor.fetchall()
+                breweries_list = [dict(r) for r in rows]
+
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"total": total_count, "breweries": breweries_list}, ensure_ascii=False).encode('utf-8'))
+            except Exception as e:
+                print(f"Admin breweries fetch error: {e}")
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+            finally:
+                if conn: conn.close()
+
         elif self.path.startswith("/api/brewery"):
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
+            b_id = params.get('id', [None])[0]
             name = params.get('name', [None])[0]
             
-            if not name:
+            if not b_id and not name:
                 self.send_response(400)
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": "name parameter is required"}).encode('utf-8'))
+                self.wfile.write(json.dumps({"error": "id or name parameter is required"}).encode('utf-8'))
                 return
                 
             conn = None
@@ -1177,7 +1223,10 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 conn = sqlite3.connect(DB_PATH)
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                cursor.execute("SELECT * FROM breweries WHERE name = ? OR name_norm = ?", (name, name))
+                if b_id:
+                    cursor.execute("SELECT * FROM breweries WHERE id = ?", (b_id,))
+                else:
+                    cursor.execute("SELECT * FROM breweries WHERE name = ? OR name_norm = ? OR kura_name = ?", (name, name, name))
                 brewery = cursor.fetchone()
                 
                 self.send_response(200)
@@ -1186,7 +1235,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.end_headers()
                 
                 if brewery:
-                    self.wfile.write(json.dumps(dict(brewery)).encode('utf-8'))
+                    self.wfile.write(json.dumps(dict(brewery), ensure_ascii=False).encode('utf-8'))
                 else:
                     self.wfile.write(json.dumps({"error": "Not found"}).encode('utf-8'))
             except Exception as e:
@@ -1420,41 +1469,141 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
 
-        elif self.path == "/api/brewery_admin/info/save":
+        elif self.path in ("/api/brewery_admin/info/save", "/api/admin/brewery/save"):
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             conn = None
             try:
                 data = json.loads(post_data.decode('utf-8'))
-                b_name = data.get('brewery_name', '').strip()
+                b_id = data.get('id')
+                b_name = data.get('brewery_name', data.get('name', '')).strip()
                 kura_name = data.get('kura_name', '').strip()
                 pref = data.get('prefecture', '').strip()
+                city = data.get('city', '').strip()
                 address = data.get('address', '').strip()
                 website = data.get('website', '').strip()
                 founded = data.get('founded_year')
+                founded_era = data.get('founded_era', '').strip()
+                era_cat = data.get('era_category', '').strip()
+                is_shinise = int(data.get('is_shinise', 0)) if data.get('is_shinise') is not None else 0
                 desc = data.get('description', '').strip()
+                
+                # 新設カラム
+                phone = data.get('phone', '').strip()
+                fax = data.get('fax', '').strip()
+                president_name = data.get('president_name', '').strip()
+                toji_name = data.get('toji_name', '').strip()
+                opening_hours = data.get('opening_hours', '').strip()
+                regular_holiday = data.get('regular_holiday', '').strip()
+                parking_info = data.get('parking_info', '').strip()
+                access_info = data.get('access_info', '').strip()
+                official_ec_url = data.get('official_ec_url', '').strip()
+                sns_instagram = data.get('sns_instagram', '').strip()
+                sns_facebook = data.get('sns_facebook', '').strip()
+                sns_twitter = data.get('sns_twitter', '').strip()
+                main_rice_varieties = data.get('main_rice_varieties', '').strip()
+                brewing_features = data.get('brewing_features', '').strip()
+                water_source_name = data.get('water_source_name', '').strip()
+                water_hardness_type = data.get('water_hardness_type', '').strip()
+                toji_guild = data.get('toji_guild', '').strip()
+                tour_info = data.get('tour_info', '').strip()
+                has_tasting = int(data.get('has_tasting', 0)) if data.get('has_tasting') is not None else 0
+                has_cafe = int(data.get('has_cafe_restaurant', 0)) if data.get('has_cafe_restaurant') is not None else 0
+                is_cult = int(data.get('is_cultural_property', 0)) if data.get('is_cultural_property') is not None else 0
+                cult_desc = data.get('cultural_property_desc', '').strip()
+                visit_allow = int(data.get('visitation_allowed', 0)) if data.get('visitation_allowed') is not None else 0
+                shop_avail = int(data.get('shop_available', 0)) if data.get('shop_available') is not None else 0
                 now = datetime.now().isoformat()
                 
-                if not b_name:
+                if not b_name and not b_id:
                     self.send_response(400)
                     self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "酒蔵名が必要です"}).encode('utf-8'))
+                    self.wfile.write(json.dumps({"status": "error", "message": "酒蔵名またはIDが必要です"}).encode('utf-8'))
                     return
                     
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
-                cursor.execute("INSERT INTO breweries (name, kura_name, prefecture, address, website, founded_year, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(name) DO UPDATE SET kura_name=excluded.kura_name, prefecture=excluded.prefecture, address=excluded.address, website=excluded.website, founded_year=excluded.founded_year, description=excluded.description, updated_at=excluded.updated_at", (b_name, kura_name, pref, address, website, founded, desc, now, now))
+                
+                if b_id:
+                    cursor.execute("""
+                        UPDATE breweries
+                        SET name = COALESCE(NULLIF(?, ''), name),
+                            kura_name = ?, prefecture = ?, city = ?, address = ?, website = ?,
+                            founded_year = ?, founded_era = ?, era_category = ?, is_shinise = ?,
+                            description = ?, phone = ?, fax = ?, president_name = ?, toji_name = ?,
+                            opening_hours = ?, regular_holiday = ?, parking_info = ?, access_info = ?,
+                            official_ec_url = ?, sns_instagram = ?, sns_facebook = ?, sns_twitter = ?,
+                            main_rice_varieties = ?, brewing_features = ?, water_source_name = ?,
+                            water_hardness_type = ?, toji_guild = ?, tour_info = ?, has_tasting = ?,
+                            has_cafe_restaurant = ?, is_cultural_property = ?, cultural_property_desc = ?,
+                            visitation_allowed = ?, shop_available = ?, updated_at = ?
+                        WHERE id = ?
+                    """, (
+                        b_name, kura_name, pref, city, address, website,
+                        founded, founded_era, era_cat, is_shinise,
+                        desc, phone, fax, president_name, toji_name,
+                        opening_hours, regular_holiday, parking_info, access_info,
+                        official_ec_url, sns_instagram, sns_facebook, sns_twitter,
+                        main_rice_varieties, brewing_features, water_source_name,
+                        water_hardness_type, toji_guild, tour_info, has_tasting,
+                        has_cafe, is_cult, cult_desc,
+                        visit_allow, shop_avail, now,
+                        b_id
+                    ))
+                else:
+                    cursor.execute("""
+                        INSERT INTO breweries (
+                            name, kura_name, prefecture, city, address, website,
+                            founded_year, founded_era, era_category, is_shinise,
+                            description, phone, fax, president_name, toji_name,
+                            opening_hours, regular_holiday, parking_info, access_info,
+                            official_ec_url, sns_instagram, sns_facebook, sns_twitter,
+                            main_rice_varieties, brewing_features, water_source_name,
+                            water_hardness_type, toji_guild, tour_info, has_tasting,
+                            has_cafe_restaurant, is_cultural_property, cultural_property_desc,
+                            visitation_allowed, shop_available, created_at, updated_at
+                        ) VALUES (
+                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                        ) ON CONFLICT(name) DO UPDATE SET
+                            kura_name=excluded.kura_name, prefecture=excluded.prefecture, city=excluded.city,
+                            address=excluded.address, website=excluded.website, founded_year=excluded.founded_year,
+                            founded_era=excluded.founded_era, era_category=excluded.era_category, is_shinise=excluded.is_shinise,
+                            description=excluded.description, phone=excluded.phone, fax=excluded.fax,
+                            president_name=excluded.president_name, toji_name=excluded.toji_name,
+                            opening_hours=excluded.opening_hours, regular_holiday=excluded.regular_holiday,
+                            parking_info=excluded.parking_info, access_info=excluded.access_info,
+                            official_ec_url=excluded.official_ec_url, sns_instagram=excluded.sns_instagram,
+                            sns_facebook=excluded.sns_facebook, sns_twitter=excluded.sns_twitter,
+                            main_rice_varieties=excluded.main_rice_varieties, brewing_features=excluded.brewing_features,
+                            water_source_name=excluded.water_source_name, water_hardness_type=excluded.water_hardness_type,
+                            toji_guild=excluded.toji_guild, tour_info=excluded.tour_info, has_tasting=excluded.has_tasting,
+                            has_cafe_restaurant=excluded.has_cafe_restaurant, is_cultural_property=excluded.is_cultural_property,
+                            cultural_property_desc=excluded.cultural_property_desc, visitation_allowed=excluded.visitation_allowed,
+                            shop_available=excluded.shop_available, updated_at=excluded.updated_at
+                    """, (
+                        b_name, kura_name, pref, city, address, website,
+                        founded, founded_era, era_cat, is_shinise,
+                        desc, phone, fax, president_name, toji_name,
+                        opening_hours, regular_holiday, parking_info, access_info,
+                        official_ec_url, sns_instagram, sns_facebook, sns_twitter,
+                        main_rice_varieties, brewing_features, water_source_name,
+                        water_hardness_type, toji_guild, tour_info, has_tasting,
+                        has_cafe, is_cult, cult_desc,
+                        visit_allow, shop_avail, now, now
+                    ))
                 conn.commit()
+                invalidate_server_cache()
                 
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                self.wfile.write(json.dumps({"status": "success", "message": "酒蔵基本情報を保存しました"}).encode('utf-8'))
+                self.wfile.write(json.dumps({"status": "success", "message": "酒蔵情報を正常に保存しました"}).encode('utf-8'))
             except Exception as e:
                 print(f"Brewery info save error: {e}")
                 self.send_response(500)
                 self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
             finally:
                 if conn: conn.close()
             return
