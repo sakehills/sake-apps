@@ -304,7 +304,7 @@ def search_web_snippets(query):
 def _call_gemini_rest(api_key, prompt_text, image_base64=None):
     """Gemini REST APIを直接呼び出す共通関数（SDK不要・標準ライブラリのみ）"""
     clean_key = api_key.strip().replace('"', '').replace("'", "")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={clean_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={clean_key}"
     
     parts = []
     if image_base64:
@@ -681,7 +681,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             diag['method'] = 'REST API (no SDK required)'
             try:
                 clean_key = os.environ.get("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={clean_key}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={clean_key}"
                 payload = json.dumps({"contents": [{"parts": [{"text": "Reply with just: OK"}]}]})
                 req = urllib.request.Request(url, data=payload.encode('utf-8'), headers={'Content-Type': 'application/json'})
                 with urllib.request.urlopen(req, timeout=15) as resp:
