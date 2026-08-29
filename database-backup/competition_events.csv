@@ -1,0 +1,44 @@
+﻿id,competition_id,year,edition_label,held_start,held_end,announced_date,venue,country,entries_total,countries_count,judges_count,judges_note,trophy_count,platinum_count,gold_count,website,status,confidence,source_id,evidence
+1,8061,2025,SAKE部門（2007年新設、2025年で18年目）,2025-04-14,2025-04-17,2025-05-20,"London, UK（授賞晩餐会は2025-09-09 The Guildhall）",United Kingdom,1476,18,70,マスターオブワイン(MW)・マスターソムリエ・バイヤー・醸造家等。金賞酒はKen Ohashi MW等5名の共同議長によるトロフィー再審査を実施。,32,,153,https://www.internationalwinechallenge.com/trophy-results-2025.html,review,0.75,competition_event_research_2026,"出品387蔵1,476点・18カ国・審査員70名。出典:jp.sake-times.com/special/news/sake_iwc2025-medal 等。銀賞・銅賞の内訳は非公開のため不明。"
+2,8093,2025,第9回（推定、2017年創設からの逆算）,2025-05-26,2025-05-26,2025-06-10,"ESPACE CHARENTON, Paris, France（授賞式は駐フランス日本大使公邸）",France,1083,,135,フランス国家最優秀職人(MOF)7名を含む、五つ星ホテルのソムリエ・ミシュラン星付きレストラン関係者・ワインジャーナリスト等。,,123,235,https://kuramaster.com/ja/concours/comite-2025/laureats/,review,0.8,competition_event_research_2026,"出品1,083点・審査員135名・8部門。プラチナ123/金235。出典:jp.sake-times.com/special/news/sake_kuramaster2025_promptreport、prtimes.jp press release等。"
+3,10037,2026,第12回,2026-05-12,2026-05-14,2026-06-10,"TAKANAWA GATEWAY CITY THE LINKPILLAR 1 SOUTH, Tokyo, Japan",Japan,1139,,43,ソムリエ・技術指導者・蔵元・有識者等43名で構成。,,,38,https://sakecompetition.com/award.html,review,0.8,competition_event_research_2026,"出品367蔵・清酒1,139点（別途首里城復興記念の泡盛部門51点）。GOLD38/SILVER74/BRONZE116。出典:sakecompetition.com/about_sakecompetition.html、PR TIMES press release。"
+4,1,2025,令和6酒造年度,2025-04-22,2025-05-09,2025-05-21,独立行政法人酒類総合研究所（広島県東広島市）,Japan,809,,,,,,202,https://www.nrib.go.jp/data/kan/shinshu/award/R06.html,review,0.8,competition_event_research_2026,出品809点・入賞410点・金賞202点。DB内awardsは入賞200+金賞194=394件で公式値と一致しないが、法人番号のない個人事業主名の行をCLAUDE.mdルール7に従い除外した結果と推定（乖離幅がほぼ一致）。出典:nrib.go.jp/data/kan/shinshu/award/R06.html、酒蔵プレス。審査員数は一次情報に記載なく不明。
+5,10038,2024,2024年度（第14回）,2024-02-20,2024-02-21,2024-03-08,学士会館 (東京都千代田区),Japan,1038,,,,,,268,http://www.finesakeawards.jp/2024/index.html,approved,1.0,,Official Result Release
+6,10039,2024,2024年度（第16回）,2024-08-06,2024-08-07,2024-08-20,学士会館 (東京都千代田区),Japan,923,,,,,,256,http://kansake.jp/2024/index.html,approved,1.0,,Official Result Release
+7,10040,2024,TWSC 2024 焼酎部門,2024-04-10,2024-04-12,2024-05-20,ホテルグランドパレス (東京),Japan,298,,,,,,85,https://tokyowhiskyandspiritcompetition.com/winnerlist/winnerlist2024/,approved,1.0,,Official Result Release
+8,10041,2024,2024 U.S. National Sake Appraisal,2024-09-17,2024-09-18,2024-09-20,ハワイ・ホノルル コンベンションセンター,United States,514,,,,,,142,https://joyofsake.jp/appraisal-2024/,approved,1.0,,Official Result Release
+20001,10001,2024,令和5酒造年度（2024年）全国新酒鑑評会,,,,東広島市 独立行政法人酒類総合研究所,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20002,10001,2023,令和4酒造年度（2023年）全国新酒鑑評会,,,,東広島市 独立行政法人酒類総合研究所,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20003,10001,2022,令和3酒造年度（2022年）全国新酒鑑評会,,,,東広島市 独立行政法人酒類総合研究所,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20004,10001,2021,令和2酒造年度（2021年）全国新酒鑑評会,,,,東広島市 独立行政法人酒類総合研究所,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20005,10001,2020,令和元酒造年度（2020年）全国新酒鑑評会,,,,東広島市 独立行政法人酒類総合研究所,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20006,10001,2019,平成30酒造年度（2019年）全国新酒鑑評会,,,,東広島市 独立行政法人酒類総合研究所,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20011,10002,2024,IWC 2024 SAKE,,,,ロンドン,イギリス,,,,,,,,,active,1.0,,Official Competition Archive
+20012,10002,2023,IWC 2023 SAKE,,,,ロンドン,イギリス,,,,,,,,,active,1.0,,Official Competition Archive
+20013,10002,2022,IWC 2022 SAKE,,,,ロンドン,イギリス,,,,,,,,,active,1.0,,Official Competition Archive
+20014,10002,2021,IWC 2021 SAKE,,,,ロンドン,イギリス,,,,,,,,,active,1.0,,Official Competition Archive
+20015,10002,2020,IWC 2020 SAKE,,,,ロンドン,イギリス,,,,,,,,,active,1.0,,Official Competition Archive
+20016,10002,2019,IWC 2019 SAKE,,,,ロンドン,イギリス,,,,,,,,,active,1.0,,Official Competition Archive
+20017,10002,2018,IWC 2018 SAKE,,,,ロンドン,イギリス,,,,,,,,,active,1.0,,Official Competition Archive
+20021,10003,2024,Kura Master 2024,,,,パリ,フランス,,,,,,,,,active,1.0,,Official Competition Archive
+20022,10003,2023,Kura Master 2023,,,,パリ,フランス,,,,,,,,,active,1.0,,Official Competition Archive
+20023,10003,2022,Kura Master 2022,,,,パリ,フランス,,,,,,,,,active,1.0,,Official Competition Archive
+20024,10003,2021,Kura Master 2021,,,,パリ,フランス,,,,,,,,,active,1.0,,Official Competition Archive
+20031,10037,2024,SAKE COMPETITION 2024,,,,東京,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20032,10037,2023,SAKE COMPETITION 2023,,,,東京,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20033,10037,2019,SAKE COMPETITION 2019,,,,東京,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20034,10037,2018,SAKE COMPETITION 2018,,,,東京,日本,,,,,,,,,active,1.0,,Official Competition Archive
+20044,10044,2024,SAKE COMPETITION 2024,,,,グランドプリンスホテル新高輪,日本,,,,,,,,https://sakecompetition.com/,active,1.0,,Official Competition Announcement
+20045,10045,2024,第18回 フェミナリーズ世界ワインコンクール 2024,,,,ボーヌ,フランス,,,,,,,,https://feminalise-japon.com/,active,1.0,,Official Competition Announcement
+20046,10046,2024,Oriental Sake Awards 2024,,,,香港コンベンション＆エキシビションセンター,香港,,,,,,,,https://www.orientalsakeawards.com/,active,1.0,,Official Competition Announcement
+20047,10047,2024,London Sake Challenge 2024,,,,ロンドン・ミレニアムグロブナーホテル,イギリス,,,,,,,,https://londonsakechallenge.com/,active,1.0,,Official Competition Announcement
+20048,10048,2024,令和6年 東北清酒鑑評会,,,,仙台国税局鑑定官室,日本,,,,,,,,https://www.nta.go.jp/about/organization/sendai/release/,active,1.0,,National Tax Agency Official Announcement
+20049,10049,2024,第95回 関東信越国税局酒類鑑評会,,,,さいたま新都心合同庁舎,日本,,,,,,,,https://www.nta.go.jp/about/organization/kantoshinetsu/release/,active,1.0,,National Tax Agency Official Announcement
+20050,10050,2024,令和6年 名古屋国税局酒類鑑評会,,,,名古屋国税総合庁舎,日本,,,,,,,,https://www.nta.go.jp/about/organization/nagoya/release/,active,1.0,,National Tax Agency Official Announcement
+20051,10051,2024,令和6年 大阪国税局清酒鑑評会,,,,大阪合同庁舎,日本,,,,,,,,https://www.nta.go.jp/about/organization/osaka/release/,active,1.0,,National Tax Agency Official Announcement
+20052,10052,2024,令和6年 広島国税局清酒鑑評会,,,,広島国税総合庁舎,日本,,,,,,,,https://www.nta.go.jp/about/organization/hiroshima/release/,active,1.0,,National Tax Agency Official Announcement
+20053,10053,2024,令和6年 熊本国税局酒類鑑評会,,,,熊本地方合同庁舎,日本,,,,,,,,https://www.nta.go.jp/about/organization/kumamoto/release/,active,1.0,,National Tax Agency Official Announcement
+20054,10054,2024,CRAFT SAKE WEEK 2024 at ROPPONGI HILLS,,,,六本木ヒルズアリーナ,日本,,,,,,,,https://craftsakeweek.com/,active,1.0,,Official Festival Announcement
+20055,10055,2024,にいがた酒の陣 2024,,,,新潟コンベンションセンター 朱鷺メッセ,日本,,,,,,,,https://www.sakenojin.jp/,active,1.0,,Official Festival Announcement
+20056,10056,2024,2024 酒まつり 西条,,,,広島県東広島市 西条酒蔵通り・酒ひろば,日本,,,,,,,,https://sakematsuri.com/,active,1.0,,Official Festival Announcement
+20057,10057,2024,SAKE PARK 4 (2024 Autumn),,,,渋谷 MIYASHITA PARK 芝生ひろば,日本,,,,,,,,https://sakepark.jp/,active,1.0,,Official Festival Announcement

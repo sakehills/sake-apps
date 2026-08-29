@@ -1,0 +1,24 @@
+﻿id,name,country,website,founded_year,organizer,description
+1,全国新酒鑑評会,Japan,https://www.nrib.go.jp/data/kan/,1911,独立行政法人酒類総合研究所・日本酒造組合中央会（共催）,1911年（明治44年）創設、日本最古の新酒鑑評会。酒類総合研究所が分析・官能審査を実施。
+8061,IWC,United Kingdom,https://www.internationalwinechallenge.com/competition/sake,1984,IWC Events Ltd,1984年英国創設のワインコンペティション。SAKE部門は2007年新設。
+8093,Kura Master,France,https://kuramaster.com,2017,Association de Kura Master,2017年創設、フランス・パリで開催される日本酒コンクール。フランス人ソムリエ中心の審査。
+10037,SAKE COMPETITION,Japan,https://sakecompetition.com,2012,SAKE COMPETITION実行委員会,2012年創設、日本国内（東京）で開催される日本酒品評会。
+10038,ワイングラスでおいしい日本酒アワード,Japan,http://www.finesakeawards.jp/,2011,ワイングラスでおいしい日本酒アワード実行委員会,日本酒の香りをワイングラスで楽しむ新しい飲酒スタイルを評価する品評会。アワードメイン部門、大吟醸部門、プレミアム純米部門、スパークリングSAKE部門など。
+10039,全国燗酒コンテスト,Japan,http://kansake.jp/,2009,全国燗酒コンテスト実行委員会 (酒文化研究所),世界で唯一『温めておいしい日本酒』を選ぶコンテスト。お値打ちぬる燗部門、お値打ち熱燗部門、プレミアム燗酒部門、特殊ぬる燗部門など。
+10040,東京ウイスキー＆スピリッツコンペティション (TWSC) 焼酎部門,Japan,https://tokyowhiskyandspiritcompetition.com/,2019,ウイスキー文化研究所 (TWSC実行委員会),日本発のアジア最大級の蒸留酒品評会。全国の本格焼酎・泡盛・スピリッツを対象に、最高金賞、金賞、銀賞、ベスト・オブ・ザ・ベストを選出。
+10041,全米日本酒歓評会 (U.S. National Sake Appraisal),United States,https://joyofsake.jp/,2001,国際酒会 (International Sake Association),ハワイ・ホノルルで開催される海外最古の日本酒歓評会。大吟醸部門、吟醸部門、純米部門にて金賞・銀賞・グランプリを授与。
+10042,ミラノ酒チャレンジ (Milano Sake Challenge),Italy,https://milanosakechallenge.com/,2019,Milano Sake Challenge 実行委員会 (イタリア酒ソムリエ協会),イタリア・ミラノでイタリア人ソムリエ・シェフ・バーテンダーが審査する品評会。テイスティング審査に加えイタリア料理とのペアリング賞も選出。
+10043,クラフトサケアワード (Craft Sake Award),Japan,https://craftsake.or.jp/,2023,クラフトサケ協会,日本酒の伝統技術をベースに、フルーツ・ハーブ・ホップなどを取り入れた新ジャンル『クラフトサケ』の専門品評会。
+10045,フェミナリーズ世界ワインコンクール 日本酒・本格焼酎部門,フランス,https://feminalise-japon.com/,2007,フェミナリーズ世界ワインコンクール本部（フランス・ボーヌ）,フランス・パリで開催される、女性ワイン・酒類専門家（ソムリエ・醸造家・ジャーナリスト等）のみが厳正に審査する国際品評会。純米大吟醸、純米吟醸、スパークリング、熟成酒、焼酎部門が設置されている。
+10046,オリエンタル・サケ・アワード (Oriental Sake Awards / OSA),香港,https://www.orientalsakeawards.com/,2022,酒サムライ・香港酒類連盟,アジア市場（香港・台湾・東南アジア等）の消費者嗜好と食文化に合わせたアジア最大級の日本酒品評会。アジアトップクラスの酒類専門家がブラインドテイスティング審査を行う。
+10047,ロンドン酒チャレンジ (London Sake Challenge),イギリス,https://londonsakechallenge.com/,2012,酒ソムリエ協会 (SSA - Sake Sommelier Association),酒ソムリエ協会（SSA）が主催するヨーロッパ最古の歴史を持つ日本酒専門品評会。世界中のトップ酒ソムリエが味・香り・パッケージデザインを総合評価する。
+10048,東北清酒鑑評会,日本,https://www.nta.go.jp/about/organization/sendai/release/,1965,仙台国税局,青森・岩手・宮城・秋田・山形・福島の東北6県の酒蔵を対象に、吟醸酒・純米酒の品質および醸造技術の向上を目的に毎年秋に開催される権威ある公的鑑評会。
+10049,関東信越国税局酒類鑑評会,日本,https://www.nta.go.jp/about/organization/kantoshinetsu/release/,1930,関東信越国税局,茨城・栃木・群馬・埼玉・新潟・長野の6県を管轄する国税局主催の鑑評会。吟醸酒の部、純米吟醸酒の部、純米酒の部で最優秀賞・優等賞が授与される。
+10050,名古屋国税局酒類鑑評会,日本,https://www.nta.go.jp/about/organization/nagoya/release/,1952,名古屋国税局,岐阜・静岡・愛知・三重の東海4県の酒造技術向上を目的とした公的品評会。吟醸酒、純米酒、本醸造酒等の各部門で審査が行われる。
+10051,大阪国税局清酒鑑評会,日本,https://www.nta.go.jp/about/organization/osaka/release/,1950,大阪国税局,滋賀・京都・大阪・兵庫・奈良・和歌山の近畿2府4県の酒蔵が参加する名門鑑評会。灘・伏見・播州などの伝統産地の最高技術が競われる。
+10052,広島国税局清酒鑑評会,日本,https://www.nta.go.jp/about/organization/hiroshima/release/,1970,広島国税局,鳥取・島根・岡山・広島・山口の中国地方5県を対象とする鑑評会。軟水醸造法発祥の地・広島をはじめ、吟醸酒・純米酒の部で優等賞を決定。
+10053,熊本国税局酒類鑑評会,日本,https://www.nta.go.jp/about/organization/kumamoto/release/,1954,熊本国税局,福岡・佐賀・長崎・熊本・大分・宮崎・鹿児島の九州全域を管轄する鑑評会。清酒部門（吟醸・純米）に加え、本格焼酎（芋・米・麦）部門が設置されている。
+10054,CRAFT SAKE WEEK,日本,https://craftsakeweek.com/,2016,株式会社JAPAN CRAFT SAKE COMPANY（中田英寿代表）,中田英寿氏が主宰する日本最高峰の日本酒イベント。全国数百蔵を巡り厳選されたトップ100蔵以上が日替わりテーマで集結し、フェスティバル限定酒やプレミアム銘柄を提供。
+10055,にいがた酒の陣,日本,https://www.sakenojin.jp/,2004,新潟県酒造組合,新潟県内全域の約80蔵が集結し、500種以上の新潟清酒を味わえる日本最大級の日本酒フェスティバル。新潟朱鷺メッセにて毎年3月に開催される一大試飲イベント。
+10056,西条酒まつり,日本,https://sakematsuri.com/,1990,酒まつり実行委員会（東広島市）,"日本三大酒処・広島県西条の酒蔵通りを中心に開催される伝統の巨大酒まつり。「酒ひろば」では全国各地の約800〜1,000銘柄の地酒が一堂に会する。"
+10057,SAKE PARK,日本,https://sakepark.jp/,2023,SAKE PARK 実行委員会,東京・渋谷MIYASHITA PARKで開催される、新世代の若手蔵元・クラフトサケ醸造所が集う都市型日本酒フェス。伝統と革新が交差する限定コラボ酒が多数出展。

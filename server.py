@@ -1,21 +1,10 @@
 def clean_img_url(p):
     if not p: return ''
     p_str = str(p).replace('\\', '/').strip()
-    if p_str.startswith('data:image/'):
-        return p_str
-    
     idx = p_str.find('cropped_images')
     if idx != -1:
         return '/' + p_str[idx:]
-    idx_up = p_str.find('uploaded_images')
-    if idx_up != -1:
-        return '/' + p_str[idx_up:]
-    if not p_str.startswith('/') and not p_str.startswith('http'):
-        return '/' + p_str
     return p_str
-
-def get_image_as_data_url(file_path):
-    return clean_img_url(file_path)
 
 # In-Memory Cache Globals
 PRODUCTS_CACHE_BYTES = None
@@ -30,7 +19,6 @@ import os
 import sqlite3
 import json
 import urllib.parse
-import urllib.request
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from datetime import datetime
 import sys
@@ -46,97 +34,6 @@ import uuid
 
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploaded_images")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-def ensure_products_populated(conn):
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS products (
-                id INTEGER PRIMARY KEY,
-                brand_name TEXT,
-                brewery_name TEXT,
-                spec_name TEXT,
-                prefecture TEXT,
-                category TEXT,
-                cropped_image_path_front TEXT,
-                ssi_type TEXT,
-                comment TEXT,
-                status TEXT,
-                created_at TEXT
-            )
-        """)
-        conn.commit()
-
-        try:
-            cursor.execute("ALTER TABLE products ADD COLUMN prefecture TEXT")
-            conn.commit()
-        except Exception:
-            pass
-
-        cursor.execute("SELECT COUNT(*) FROM products")
-        row = cursor.fetchone()
-        count = row[0] if row else 0
-        if count == 0:
-            print("[Auto DB Repair] products テーブルのデータを構築中...")
-            query = """
-                SELECT 
-                    b.id,
-                    b.name as brand_name,
-                    br.name as brewery_name,
-                    br.prefecture as prefecture
-                FROM brands b
-                LEFT JOIN breweries br ON b.brewery_id = br.id
-            """
-            cursor.execute(query)
-            rows = cursor.fetchall()
-            
-            for r in rows:
-                b_id, brand_name, brewery_name, pref = r[0], r[1], r[2], r[3]
-                cursor.execute("""
-                    INSERT OR REPLACE INTO products (id, brand_name, brewery_name, spec_name, prefecture, status)
-                    VALUES (?, ?, ?, ?, ?, 'active')
-                """, (b_id, brand_name or '', brewery_name or '', brand_name or '', pref or ''))
-            
-            try:
-                cursor.execute("""
-                    UPDATE products
-                    SET ssi_type = (SELECT ssi_type FROM user_flavor_ratings WHERE product_id = products.id LIMIT 1),
-                        comment = (SELECT comment FROM user_flavor_ratings WHERE product_id = products.id LIMIT 1)
-                    WHERE id IN (SELECT DISTINCT product_id FROM user_flavor_ratings)
-                """)
-            except Exception as update_err:
-                print(f"[Auto DB Repair Update Warning]: {update_err}")
-                
-            conn.commit()
-            print(f"[Auto DB Repair] 自動展開完了: {len(rows)} 件の銘柄データを復元しました。")
-
-        # 画像パスの常時同期・復元（user_flavor_ratings投稿写真 ＆ sake_bottles公式写真）
-        try:
-            cursor.execute("""
-                UPDATE products
-                SET cropped_image_path_front = (
-                    SELECT rating_image FROM user_flavor_ratings 
-                    WHERE product_id = products.id AND rating_image IS NOT NULL AND rating_image != '' 
-                    ORDER BY id DESC LIMIT 1
-                )
-                WHERE (cropped_image_path_front IS NULL OR cropped_image_path_front = '')
-                  AND id IN (SELECT DISTINCT product_id FROM user_flavor_ratings WHERE rating_image IS NOT NULL AND rating_image != '')
-            """)
-            cursor.execute("""
-                UPDATE products
-                SET cropped_image_path_front = (
-                    SELECT cropped_image_path_front FROM sake_bottles 
-                    WHERE sake_bottles.id = products.id OR sake_bottles.name LIKE '%' || products.brand_name || '%'
-                    LIMIT 1
-                )
-                WHERE (cropped_image_path_front IS NULL OR cropped_image_path_front = '')
-                  AND id IN (SELECT id FROM sake_bottles WHERE cropped_image_path_front IS NOT NULL AND cropped_image_path_front != '')
-            """)
-            conn.commit()
-        except Exception as img_err:
-            print(f"[Auto DB Image Sync Warning]: {img_err}")
-    except Exception as e:
-        print(f"[Auto DB Repair エラー]: {e}")
 
 def save_base64_image(base64_str, prefix="img"):
     if not base64_str or not base64_str.startswith("data:image/"):
@@ -168,115 +65,8 @@ def save_base64_image(base64_str, prefix="img"):
         print(f"画像保存エラー: {e}")
         return base64_str
 
-def process_admin_bottle_image(base64_str, product_id, auto_crop=True):
-    """
-    Decodes base64 image, fixes EXIF rotation, downsamples to max 800px.
-    If auto_crop is True: performs background removal / bottle bounding crop.
-    If auto_crop is False: uploads as-is (no AI cropping), centered on 800x800 white 1:1 canvas.
-    """
-    if not base64_str: return None
-    import base64, io, time
-    from PIL import Image, ImageOps
-
-    try:
-        if ',' in base64_str:
-            header, encoded = base64_str.split(',', 1)
-        else:
-            encoded = base64_str
-        img_bytes = base64.b64decode(encoded)
-        img = Image.open(io.BytesIO(img_bytes))
-        # EXIF rotation fix (fixes iPhone photo orientation!)
-        img = ImageOps.exif_transpose(img)
-        img = img.convert("RGB")
-        
-        # Fast downsample high-res photos to max 800px width/height first
-        img.thumbnail((800, 800), Image.Resampling.LANCZOS)
-    except Exception as e:
-        print(f"Image decode error: {e}")
-        return None
-
-    # Ensure portrait orientation (bottles are vertical)
-    if img.width > img.height:
-        img = img.rotate(270, expand=True)
-
-    if auto_crop:
-        # 1. Background removal attempt using rembg
-        rembg_success = False
-        try:
-            from rembg import remove
-            removed = remove(img.convert("RGBA"))
-            bbox = removed.getbbox()
-            if bbox:
-                img = removed.crop(bbox)
-                rembg_success = True
-        except Exception:
-            pass
-
-        # 2. OpenCV GrabCut background white-out & bottle bounding box crop
-        if not rembg_success:
-            try:
-                import cv2
-                import numpy as np
-
-                img_np = np.array(img)
-                h, w, _ = img_np.shape
-
-                # GrabCut mask around center rectangle
-                mask = np.zeros((h, w), np.uint8)
-                bgdModel = np.zeros((1, 65), np.float64)
-                fgdModel = np.zeros((1, 65), np.float64)
-                rect = (int(w * 0.05), int(h * 0.04), int(w * 0.90), int(h * 0.92))
-                cv2.grabCut(img_np, mask, rect, bgdModel, fgdModel, 3, cv2.GC_INIT_WITH_RECT)
-
-                fg_mask = np.where((mask == 1) | (mask == 3), 255, 0).astype('uint8')
-                
-                # Smooth mask edges
-                kernel = np.ones((5, 5), np.uint8)
-                fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel)
-
-                # Bounding box of detected bottle
-                contours, _ = cv2.findContours(fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                if contours:
-                    c = max(contours, key=cv2.contourArea)
-                    x, y, bw, bh = cv2.boundingRect(c)
-                    if bw > w * 0.12 and bh > h * 0.12:
-                        img_rgba_np = np.array(img.convert("RGBA"))
-                        img_rgba_np[:, :, 3] = fg_mask
-                        cropped_np = img_rgba_np[y:y+bh, x:x+bw]
-                        img = Image.fromarray(cropped_np)
-            except Exception as cv_err:
-                print(f"OpenCV whiteout notice: {cv_err}")
-
-    # Re-check orientation after crop (must be vertical bottle!)
-    if img.width > img.height:
-        img = img.rotate(270, expand=True)
-
-    # Paste centered onto 800x800 crisp white 1:1 canvas
-    canvas_size = (800, 800)
-    bg = Image.new("RGBA", canvas_size, (255, 255, 255, 255))
-
-    # Resize bottle image to fit within 760x760 inside canvas
-    img.thumbnail((760, 760), Image.Resampling.LANCZOS)
-
-    # Center bottle
-    x = (canvas_size[0] - img.width) // 2
-    y = (canvas_size[1] - img.height) // 2
-
-    if img.mode == 'RGBA':
-        bg.paste(img, (x, y), img)
-    else:
-        bg.paste(img, (x, y))
-
-    final_img = bg.convert("RGB")
-    admin_upload_dir = os.path.join(BASE_DIR, "cropped_images", "admin_uploads")
-    os.makedirs(admin_upload_dir, exist_ok=True)
-
-    filename = f"prod_{product_id}_{int(time.time())}.jpg"
-    filepath = os.path.join(admin_upload_dir, filename)
-    final_img.save(filepath, "JPEG", quality=92)
-
-    return f"/cropped_images/admin_uploads/{filename}"
-
+import urllib.parse
+import urllib.request
 import re
 
 def search_web_snippets(query):
@@ -301,47 +91,60 @@ def search_web_snippets(query):
         print(f"検索エラー (HTML GET): {e}")
         return ""
 
-def _call_gemini_rest(api_key, prompt_text, image_base64=None):
-    """Gemini REST APIを直接呼び出す共通関数（SDK不要・標準ライブラリのみ）"""
-    clean_key = api_key.strip().replace('"', '').replace("'", "")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={clean_key}"
-    
-    parts = []
-    if image_base64:
-        if "," in image_base64:
-            header, encoded = image_base64.split(",", 1)
-            mime_type = header.split(";")[0].split(":")[1]
-        else:
-            encoded = image_base64
-            mime_type = "image/jpeg"
-        parts.append({"inline_data": {"mime_type": mime_type, "data": encoded}})
-    parts.append({"text": prompt_text})
-    
-    payload = json.dumps({"contents": [{"parts": parts}]})
-    req = urllib.request.Request(url, data=payload.encode('utf-8'), headers={'Content-Type': 'application/json'})
-    
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        result = json.loads(resp.read().decode('utf-8'))
-    
-    text = result['candidates'][0]['content']['parts'][0]['text'].strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        if text.startswith("json"):
-            text = text[4:]
-    return json.loads(text.strip())
-
 def extract_specs_with_gemini(brand, brewery, search_text):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         print("警告: GEMINI_API_KEY が設定されていません。")
-        return {"category": None, "alcohol": None, "polish_ratio": None, "ingredients": None, "rice_variety": None, "yeast": None, "smv": None, "acidity": None, "amino_acidity": None, "heating_type": None, "is_genshu": None, "brewing_method": None, "serving_temperature": None, "confidence": 0.0}
+        return {
+            "category": None, "alcohol": None, "polish_ratio": None,
+            "ingredients": None, "rice_variety": None, "yeast": None,
+            "smv": None, "acidity": None, "amino_acidity": None,
+            "heating_type": None, "is_genshu": None, "brewing_method": None, "serving_temperature": None,
+            "confidence": 0.0
+        }
+        
     try:
-        prompt = f'''以下の検索テキスト情報を元に、日本酒「{brand}」（製造蔵: {brewery}）の製品スペックを抽出し、純粋なJSONオブジェクトのみで返答してください。推測が含まれる場合は confidence を低く（0.5〜0.6）、確実な場合は高く（0.8〜0.9）設定してください。情報がない場合は null にしてください。余計な文章やマークダウンの囲みは一切含めず、純粋なJSON文字列だけを返してください。
-{{"category":null,"alcohol":null,"polish_ratio":null,"ingredients":null,"rice_variety":null,"yeast":null,"smv":null,"acidity":null,"amino_acidity":null,"heating_type":null,"is_genshu":null,"brewing_method":null,"serving_temperature":null,"confidence":0.0}}
-検索情報: {search_text}'''
-        return _call_gemini_rest(api_key, prompt)
+        from google import genai
+        clean_key = api_key.strip().replace('"', '').replace("'", "")
+        client = genai.Client(api_key=clean_key)
+        
+        prompt = f'''以下の検索テキスト情報を元に、日本酒「{brand}」（製造蔵: {brewery}）の製品スペック（特定名称、アルコール度数、精米歩合、原材料、原料米、使用酵母、日本酒度、酸度、アミノ酸度、およびディープスペックとして火入れ回数/タイプ、原酒かどうか、仕込み方法、推奨飲用温度帯）を抽出し、以下のキーを持つ純粋なJSONオブジェクトのみで返答してください。推測が含まれる場合は confidence を低く（0.5〜0.6）、確実な場合は高く（0.8〜0.9）設定してください。情報がない場合は null にしてください。
+※余計な文章やマークダウンの ```json 等の囲みは一切含めず、純粋なJSON文字列だけを返してください。
+
+【出力キーと型】
+{{
+  "category": "純米吟醸 などの特定名称文字列 (または null)",
+  "alcohol": 15.5 などの数値 (または null)",
+  "polish_ratio": "50% などの文字列 (または null)",
+  "ingredients": "米、米麹 などのカンマ区切り文字列 (または null)",
+  "rice_variety": "山田錦 などの文字列 (または null)",
+  "yeast": "協会9号 などの酵母名 (または null)",
+  "smv": "+3.0 などの符号付き日本酒度 (または null)",
+  "acidity": "1.4 などの酸度数値文字列 (占有は null)",
+  "amino_acidity": "1.2 などのアミノ酸度数値文字列 (または null)",
+  "heating_type": "生酒, 生詰, 生貯蔵, 2回火入れ などの加熱タイプ文字列 (または null)",
+  "is_genshu": 原酒である（加水無しの記述あり）なら 1, そうでないなら 0 (または null)",
+  "brewing_method": "生酛, 山廃, 木桶仕込み などの製造手法文字列 (または null)",
+  "serving_temperature": "冷酒, ぬる燗, 熱燗 などのおすすめ温度帯文字列 (または null)",
+  "confidence": 0.0〜1.0 の数値
+}}
+
+【検索情報】
+{search_text}'''
+        
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt
+        )
+        text = response.text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        text = text.strip()
+        return json.loads(text)
     except Exception as e:
-        print(f"Gemini REST API実行エラー: {e}")
+        print(f"Gemini SDK実行エラー: {e}")
         return None
 
 def analyze_label_with_gemini(image_base64):
@@ -349,113 +152,60 @@ def analyze_label_with_gemini(image_base64):
     if not api_key:
         print("警告: GEMINI_API_KEY が設定されていません。")
         return None
+        
     try:
-        prompt = '''この日本酒の裏ラベル画像から、記載されている製品スペックをテキストOCRで読み取り、純粋なJSONオブジェクトのみで返答してください。画像内に値が明記されていない項目は絶対に推測せず必ず null に設定してください。余計な文章やマークダウンの囲みは一切含めないでください。
-{"category":null,"alcohol":null,"polish_ratio":null,"ingredients":null,"rice_variety":null,"yeast":null,"smv":null,"acidity":null,"amino_acidity":null,"heating_type":null,"is_genshu":null,"brewing_method":null,"serving_temperature":null}'''
-        return _call_gemini_rest(api_key, prompt, image_base64)
+        from google import genai
+        clean_key = api_key.strip().replace('"', '').replace("'", "")
+        client = genai.Client(api_key=clean_key)
+        
+        # Base64をパース
+        if "," in image_base64:
+            header, encoded = image_base64.split(",", 1)
+            mime_type = header.split(";")[0].split(":")[1]
+        else:
+            encoded = image_base64
+            mime_type = "image/jpeg"
+            
+        img_bytes = base64.b64decode(encoded)
+        
+        prompt = '''この日本酒の裏ラベル画像から、記載されている製品スペック（特定名称、アルコール度数、精米歩合、原材料、原料米、使用酵母、日本酒度、酸度、アミノ酸度、およびディープスペックとして火入れ回数/タイプ、原酒かどうか、仕込み方法、推奨飲用温度帯）をテキストOCRで読み取り、以下のキーを持つ純粋なJSONオブジェクトのみで返答してください。
+画像内に値が明記されていない、または読み取れない項目は絶対に推測せず、必ず null に設定してください。
+※余計な文章やマークダウンの ```json 等の囲みは一切含めず、純粋なJSON文字列だけを返してください。
+
+【出力キーと型】
+{
+  "category": "純米吟醸 などの特定名称文字列 (または null)",
+  "alcohol": 15.5 などの数値 (或者 null)",
+  "polish_ratio": "50% などの文字列 (または null)",
+  "ingredients": "米、米麹 などのカンマ区切り文字列 (または null)",
+  "rice_variety": "山田錦 などの使用米文字列 (または null)",
+  "yeast": "協会9号 などの使用酵母名 (または null)",
+  "smv": "+3.0 などの符号付き日本酒度 (または null)",
+  "acidity": "1.4 などの酸度数値文字列 (または null)",
+  "amino_acidity": "1.2 などのアミノ酸度数値文字列 (または null)",
+  "heating_type": "生酒, 生詰, 生貯蔵, 2回火入れ などの加熱タイプ文字列 (または null)",
+  "is_genshu": 原酒である（加水無しの記述あり）なら 1, そうでないなら 0 (または null)",
+  "brewing_method": "生酛, 山廃, 木桶仕込み などの製造手法文字列 (または null)",
+  "serving_temperature": "冷酒, ぬる燗, 熱燗 などのおすすめ温度帯文字列 (または null)"
+}'''
+        
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=[
+                genai.types.Part.from_bytes(data=img_bytes, mime_type=mime_type),
+                prompt
+            ]
+        )
+        text = response.text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        text = text.strip()
+        return json.loads(text)
     except Exception as e:
         print(f"GeminiマルチモーダルOCRエラー: {e}")
         return None
-
-def analyze_front_label_with_gemini(image_base64):
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        print("警告: GEMINI_API_KEY が設定されていません。")
-        return None
-    try:
-        prompt = '''この日本酒ボトルまたはラベル画像から、記載されている「銘柄名」「酒蔵名」「特定名称・種別」およびその他特徴的なキーワードを読み取り、純粋なJSONオブジェクトのみで返答してください。判別できない項目は null に設定してください。余計な文章やマークダウンの囲みは一切含めないでください。
-{"brand_name":null,"brewery_name":null,"spec_name":null,"keywords":[]}'''
-        return _call_gemini_rest(api_key, prompt, image_base64)
-    except Exception as e:
-        print(f"Gemini表ラベルOCR解析エラー: {e}")
-        return None
-
-def search_products_by_ai_label(conn, ai_data):
-    """
-    AI抽出結果（銘柄名・酒蔵名・スペック等）を元にDB（productsテーブル）を検索しスコアリングして返却する
-    """
-    if not ai_data:
-        return []
-    
-    brand = (ai_data.get('brand_name') or '').strip()
-    brewery = (ai_data.get('brewery_name') or '').strip()
-    spec = (ai_data.get('spec_name') or '').strip()
-    keywords = ai_data.get('keywords') or []
-
-    cursor = conn.cursor()
-    
-    query_parts = []
-    params = []
-
-    if brand:
-        query_parts.append("p.brand_name LIKE ?")
-        params.append(f"%{brand}%")
-    brewery_clean = brewery.replace('株式会社', '').replace('株式會社', '').replace('有限会社', '').replace('合名会社', '').replace('合資会社', '').strip()
-    if brewery_clean:
-        query_parts.append("p.brewery_name LIKE ? OR b.name LIKE ?")
-        params.extend([f"%{brewery_clean}%", f"%{brewery_clean}%"])
-    for kw in keywords:
-        if isinstance(kw, str) and len(kw) >= 2 and kw not in (brand, brewery):
-            query_parts.append("(p.brand_name LIKE ? OR p.spec_name LIKE ? OR p.brewery_name LIKE ?)")
-            params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
-
-    if not query_parts:
-        cursor.execute("""
-            SELECT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture
-            FROM products p
-            LEFT JOIN breweries b ON p.brewery_name LIKE '%' || b.name || '%' OR b.name LIKE '%' || p.brewery_name || '%'
-            ORDER BY p.id DESC LIMIT 10
-        """)
-        rows = cursor.fetchall()
-        results = [dict(r) for r in rows]
-        for item in results:
-            item['match_score'] = 10
-        return results
-
-    sql = f"""
-        SELECT DISTINCT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture
-        FROM products p
-        LEFT JOIN breweries b ON p.brewery_name LIKE '%' || b.name || '%' OR b.name LIKE '%' || p.brewery_name || '%'
-        WHERE {" OR ".join(query_parts)}
-        LIMIT 50
-    """
-    cursor.execute(sql, params)
-    rows = cursor.fetchall()
-    
-    results = []
-    for r in rows:
-        item = dict(r)
-        score = 0
-        p_brand = item.get('brand_name') or ''
-        p_brewery = item.get('brewery_name') or ''
-        p_spec = item.get('spec_name') or ''
-        
-        if brand:
-            if brand == p_brand:
-                score += 50
-            elif brand in p_brand or p_brand in brand:
-                score += 35
-        
-        if brewery_clean:
-            if brewery_clean == p_brewery:
-                score += 30
-            elif brewery_clean in p_brewery or p_brewery in brewery_clean:
-                score += 20
-                
-        if spec:
-            if spec in p_spec or p_spec in spec:
-                score += 15
-                
-        for kw in keywords:
-            if isinstance(kw, str) and len(kw) >= 2:
-                if kw in p_brand or kw in p_brewery or kw in p_spec:
-                    score += 5
-
-        item['match_score'] = score
-        results.append(item)
-        
-    results.sort(key=lambda x: x['match_score'], reverse=True)
-    return results[:10]
 
 
 def generate_ai_comment_for_product(conn, product_id, user_name, image_path, image_path_2=None, custom_notes=""):
@@ -579,65 +329,22 @@ def generate_ai_comment_for_product(conn, product_id, user_name, image_path, ima
 
 class SakeApiServer(SimpleHTTPRequestHandler):
     def translate_path(self, path):
-        if not hasattr(self, 'directory'):
-            self.directory = BASE_DIR
-        # WSGI PEP 3333 latin-1 エンコーディングフォールバック
-        try:
-            path = path.encode('iso-8859-1').decode('utf-8')
-        except Exception:
-            pass
-
-        # クエリ文字列(?...)やアンカー(#...)を分離
-        clean_path = path.split('?')[0].split('#')[0]
-        try:
-            clean_path = urllib.parse.unquote(clean_path)
-        except Exception:
-            pass
-
-        if clean_path.endswith('/') and len(clean_path) > 1:
-            clean_path = clean_path[:-1]
-
-        # ルートおよびHTMLページのエイリアス翻訳
-        if clean_path in ("/", ""):
+        # viewer.htmlをルートとしてサービングするためのパス翻訳
+        if path == "/" or path == "":
             return os.path.join(BASE_DIR, "app", "viewer.html")
-        elif clean_path in ("/admin", "/admin.html", "/app/admin.html"):
+        elif path == "/admin" or path == "/admin.html":
             return os.path.join(BASE_DIR, "app", "admin.html")
-        elif clean_path in ("/map", "/map.html", "/app/map.html"):
+        elif path == "/map" or path == "/map.html":
             return os.path.join(BASE_DIR, "app", "map.html")
-        elif clean_path in ("/brewery_admin", "/brewery_admin.html", "/app/brewery_admin.html"):
+        elif path == "/brewery_admin" or path == "/brewery_admin.html":
             return os.path.join(BASE_DIR, "app", "brewery_admin.html")
-        elif clean_path in ("/mobile", "/mobile.html", "/mobile_viewer.html", "/mobile_viewer", "/app/mobile_viewer.html"):
+        elif path == "/mobile" or path == "/mobile.html":
             return os.path.join(BASE_DIR, "app", "mobile_viewer.html")
-
-        # 画像やCSS, JSなどの静的ファイルのパス解決
-        rel_path = clean_path.lstrip('/')
-        return os.path.join(BASE_DIR, rel_path)
+        return super().translate_path(path)
     def do_GET(self):
-        # 画像ファイル（/uploaded_images/ および /cropped_images/）の静的配信
-        clean_p = urllib.parse.unquote(self.path.split('?')[0].split('#')[0])
-        if clean_p.startswith('/uploaded_images/') or clean_p.startswith('/cropped_images/'):
-            file_path = os.path.join(BASE_DIR, clean_p.lstrip('/'))
-            if os.path.exists(file_path):
-                ext = os.path.splitext(file_path)[1].lower()
-                mime = 'image/jpeg'
-                if ext == '.png': mime = 'image/png'
-                elif ext == '.webp': mime = 'image/webp'
-                elif ext == '.gif': mime = 'image/gif'
-                
-                try:
-                    with open(file_path, 'rb') as f:
-                        img_bytes = f.read()
-                    self.send_response(200)
-                    self.send_header('Content-Type', mime)
-                    self.send_header('Cache-Control', 'public, max-age=86400')
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.end_headers()
-                    self.wfile.write(img_bytes)
-                    return
-                except Exception as e:
-                    print(f"Direct image serve error: {e}")
-
         if self.path.startswith("/api/image/proxy"):
+            import urllib.parse
+            import urllib.request
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             image_url = params.get('url', [None])[0]
@@ -670,35 +377,8 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.end_headers()
             return
             
-        elif self.path == "/api/debug-ai":
-            # 診断用エンドポイント: REST API直接呼び出し方式の動作確認
-            diag = {}
-            try:
-                diag['api_key_set'] = bool(os.environ.get("GEMINI_API_KEY"))
-                diag['api_key_length'] = len(os.environ.get("GEMINI_API_KEY", ""))
-            except:
-                diag['api_key_set'] = False
-            diag['method'] = 'REST API (no SDK required)'
-            try:
-                clean_key = os.environ.get("GEMINI_API_KEY", "").strip().replace('"', '').replace("'", "")
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={clean_key}"
-                payload = json.dumps({"contents": [{"parts": [{"text": "Reply with just: OK"}]}]})
-                req = urllib.request.Request(url, data=payload.encode('utf-8'), headers={'Content-Type': 'application/json'})
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    result = json.loads(resp.read().decode('utf-8'))
-                reply = result['candidates'][0]['content']['parts'][0]['text'].strip()
-                diag['gemini_test'] = f'OK: {reply[:50]}'
-            except Exception as e:
-                diag['gemini_test'] = f'FAIL: {e}'
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(diag, ensure_ascii=False).encode('utf-8'))
-            return
-
         elif self.path == "/api/products" or self.path.startswith("/api/products?"):
+            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             
@@ -706,12 +386,11 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             limit = int(params.get('limit', [30])[0])
             search = params.get('search', [''])[0].strip()
             brewery = params.get('brewery', [''])[0].strip()
-            prefecture = params.get('prefecture', [''])[0].strip()
             sake_type = params.get('type', [''])[0].strip()
             ssi = params.get('ssi', [''])[0].strip()
+            celebration = params.get('celebration', [''])[0].strip()
             image_filter = params.get('image_filter', [''])[0].strip()
             collection = params.get('collection', [''])[0].strip()
-            rated_by = params.get('rated_by', [''])[0].strip()
             sort_order = params.get('sort', ['id_desc'])[0].strip()
 
             offset = (page - 1) * limit
@@ -719,167 +398,86 @@ class SakeApiServer(SimpleHTTPRequestHandler):
             conn = None
             try:
                 conn = sqlite3.connect(DB_PATH)
-                ensure_products_populated(conn)
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
 
-                where_clauses = ["(p.status IS NULL OR p.status != 'rejected')"]
+                where_clauses = ["status != 'rejected'"]
                 query_args = []
 
-                if rated_by:
-                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM user_flavor_ratings WHERE user_name = ?)")
-                    query_args.append(rated_by)
-
                 if search:
-                    search_terms = search.replace('　', ' ').split()
-                    for term_text in search_terms:
-                        if not term_text: continue
-                        t_like = f"%{term_text}%"
-                        where_clauses.append("""(
-                            LOWER(p.brand_name) LIKE LOWER(?) OR 
-                            LOWER(p.brewery_name) LIKE LOWER(?) OR 
-                            LOWER(p.spec_name) LIKE LOWER(?) OR 
-                            LOWER(COALESCE(b.prefecture, '')) LIKE LOWER(?) OR
-                            LOWER(COALESCE(b.name, '')) LIKE LOWER(?) OR
-                            LOWER(COALESCE(b.kura_name, '')) LIKE LOWER(?)
-                        )""")
-                        query_args.extend([t_like, t_like, t_like, t_like, t_like, t_like])
+                    where_clauses.append("(LOWER(brand_name) LIKE LOWER(?) OR LOWER(brewery_name) LIKE LOWER(?) OR LOWER(spec_name) LIKE LOWER(?) OR LOWER(celebration_scenes) LIKE LOWER(?))")
+                    term = f"%{search}%"
+                    query_args.extend([term, term, term, term])
 
                 if brewery:
-                    where_clauses.append("(p.brewery_name LIKE ? OR p.brand_name LIKE ?)")
+                    where_clauses.append("(brewery_name LIKE ? OR brand_name LIKE ?)")
                     b_term = f"%{brewery}%"
                     query_args.extend([b_term, b_term])
 
-                if prefecture:
-                    where_clauses.append("(p.prefecture LIKE ? OR b.prefecture LIKE ?)")
-                    p_term = f"%{prefecture}%"
-                    query_args.extend([p_term, p_term])
-
                 if sake_type:
-                    where_clauses.append("(p.category LIKE ? OR p.spec_name LIKE ?)")
+                    where_clauses.append("(category LIKE ? OR spec_name LIKE ?)")
                     t_term = f"%{sake_type}%"
                     query_args.extend([t_term, t_term])
 
                 if ssi:
-                    where_clauses.append("p.ssi_type = ?")
+                    where_clauses.append("ssi_type = ?")
                     query_args.append(ssi)
 
+                if celebration:
+                    where_clauses.append("celebration_scenes LIKE ?")
+                    query_args.append(f"%{celebration}%")
+
                 if image_filter == 'has_image':
-                    where_clauses.append("(p.cropped_image_path_front IS NOT NULL AND p.cropped_image_path_front != '')")
+                    where_clauses.append("(cropped_image_path_front IS NOT NULL AND cropped_image_path_front != '')")
                 elif image_filter == 'no_image':
-                    where_clauses.append("(p.cropped_image_path_front IS NULL OR p.cropped_image_path_front = '')")
+                    where_clauses.append("(cropped_image_path_front IS NULL OR cropped_image_path_front = '')")
 
                 if collection == 'gold_award':
-                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM awards WHERE is_gold_award = 1 AND product_id IS NOT NULL)")
+                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE is_gold_award = 1 AND product_id IS NOT NULL)")
                 elif collection == 'iwc':
-                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%IWC%' AND product_id IS NOT NULL)")
+                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%IWC%' AND product_id IS NOT NULL)")
                 elif collection == 'fine_sake':
-                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%ワイングラス%' AND product_id IS NOT NULL)")
+                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%ワイングラス%' AND product_id IS NOT NULL)")
                 elif collection == 'kura_master':
-                    where_clauses.append("p.id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%Kura Master%' AND product_id IS NOT NULL)")
+                    where_clauses.append("id IN (SELECT DISTINCT product_id FROM awards WHERE competition_name LIKE '%Kura Master%' AND product_id IS NOT NULL)")
                 elif collection == 'sparkling':
-                    where_clauses.append("(p.category LIKE '%スパークリング%' OR p.category LIKE '%発泡%')")
+                    where_clauses.append("(category LIKE '%スパークリング%' OR category LIKE '%発泡%')")
                 elif collection == 'shochu_craft':
-                    where_clauses.append("(p.category LIKE '%焼酎%' OR p.category LIKE '%クラフト%')")
+                    where_clauses.append("(category LIKE '%焼酎%' OR category LIKE '%クラフト%')")
                 elif collection == 'kunshu':
-                    where_clauses.append("(p.ssi_type = '薫酒' OR p.category LIKE '%純米大吟醸%' OR p.category LIKE '%大吟醸%')")
+                    where_clauses.append("(ssi_type = '薫酒' OR category LIKE '%純米大吟醸%' OR category LIKE '%大吟醸%')")
                 elif collection == 'junmai':
-                    where_clauses.append("(p.ssi_type = '醇酒' OR p.category LIKE '%純米%')")
+                    where_clauses.append("(ssi_type = '醇酒' OR category LIKE '%純米%')")
+                elif collection == 'wedding':
+                    where_clauses.append("celebration_scenes LIKE '%結婚%'")
+                elif collection == 'longevity':
+                    where_clauses.append("celebration_scenes LIKE '%長寿%'")
+                elif collection == 'promotion':
+                    where_clauses.append("(celebration_scenes LIKE '%昇進%' OR celebration_scenes LIKE '%開店%')")
+                elif collection == 'birthday':
+                    where_clauses.append("(celebration_scenes LIKE '%誕生日%' OR celebration_scenes LIKE '%記念日%')")
+                elif collection == 'newyear':
+                    where_clauses.append("celebration_scenes LIKE '%正月%'")
 
                 where_str = " AND ".join(where_clauses)
-                from_str = "products p LEFT JOIN breweries b ON p.brewery_name = b.name"
 
                 # Total count query
-                count_sql = f"SELECT COUNT(*) FROM {from_str} WHERE {where_str}"
+                count_sql = f"SELECT COUNT(*) FROM products WHERE {where_str}"
                 cursor.execute(count_sql, query_args)
                 total_items = cursor.fetchone()[0]
                 total_pages = max(1, (total_items + limit - 1) // limit)
 
                 # Order clause
-                order_clause = "ORDER BY p.id DESC"
-                if sort_order == 'pref_asc':
-                    order_clause = """ORDER BY (CASE 
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%北海道%' THEN 1
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%青森%' THEN 2
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%岩手%' THEN 3
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%宮城%' THEN 4
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%秋田%' THEN 5
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%山形%' THEN 6
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%福島%' THEN 7
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%茨城%' THEN 8
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%栃木%' THEN 9
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%群馬%' THEN 10
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%埼玉%' THEN 11
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%千葉%' THEN 12
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%東京%' THEN 13
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%神奈川%' THEN 14
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%新潟%' THEN 15
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%富山%' THEN 16
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%石川%' THEN 17
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%福井%' THEN 18
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%山梨%' THEN 19
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%長野%' THEN 20
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%岐阜%' THEN 21
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%静岡%' THEN 22
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%愛知%' THEN 23
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%三重%' THEN 24
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%滋賀%' THEN 25
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%京都%' THEN 26
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%大阪%' THEN 27
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%兵庫%' THEN 28
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%奈良%' THEN 29
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%和歌山%' THEN 30
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%鳥取%' THEN 31
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%島根%' THEN 32
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%岡山%' THEN 33
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%広島%' THEN 34
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%山口%' THEN 35
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%徳島%' THEN 36
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%香川%' THEN 37
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%愛媛%' THEN 38
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%高知%' THEN 39
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%福岡%' THEN 40
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%佐賀%' THEN 41
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%長崎%' THEN 42
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%熊本%' THEN 43
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%大分%' THEN 44
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%宮崎%' THEN 45
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%鹿児島%' THEN 46
-                        WHEN COALESCE(p.prefecture, b.prefecture, '') LIKE '%沖縄%' THEN 47
-                        ELSE 99 END) ASC, p.id DESC"""
-                elif sort_order == 'id_asc':
-                    order_clause = "ORDER BY p.id ASC"
-                elif sort_order == 'brewery_asc':
-                    order_clause = "ORDER BY p.brewery_name ASC, p.brand_name ASC"
-                elif sort_order == 'brand_asc' or sort_order == 'name_asc':
-                    order_clause = "ORDER BY p.brand_name ASC"
+                order_clause = "ORDER BY id DESC"
+                if sort_order == 'id_asc':
+                    order_clause = "ORDER BY id ASC"
+                elif sort_order == 'name_asc':
+                    order_clause = "ORDER BY brand_name ASC"
 
                 # Main Data query with LIMIT & OFFSET
-                data_sql = f"SELECT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture FROM {from_str} WHERE {where_str} {order_clause} LIMIT ? OFFSET ?"
+                data_sql = f"SELECT * FROM products WHERE {where_str} {order_clause} LIMIT ? OFFSET ?"
                 cursor.execute(data_sql, query_args + [limit, offset])
                 products = [dict(r) for r in cursor.fetchall()]
-
-                # もし products が 0 件の場合、brands テーブルから直接自動フォールバック取得
-                if not products and not search and not brewery and not prefecture and not sake_type and not ssi and not collection and not rated_by:
-                    print("[Dual Fallback] productsが0件のため、brandsから直接10,096件の一覧を取得します...")
-                    cursor.execute("""
-                        SELECT 
-                            b.id,
-                            b.name as brand_name,
-                            br.name as brewery_name,
-                            COALESCE(br.prefecture, '') as display_prefecture,
-                            b.name as spec_name
-                        FROM brands b
-                        LEFT JOIN breweries br ON b.brewery_id = br.id
-                        ORDER BY b.id DESC
-                        LIMIT ? OFFSET ?
-                    """, (limit, offset))
-                    fallback_rows = cursor.fetchall()
-                    products = [dict(r) for r in fallback_rows]
-                    
-                    cursor.execute("SELECT COUNT(*) FROM brands")
-                    total_items = cursor.fetchone()[0]
-                    total_pages = max(1, (total_items + limit - 1) // limit)
 
                 # Attach awards & ratings ONLY for the 30 returned products
                 if products:
@@ -904,18 +502,10 @@ class SakeApiServer(SimpleHTTPRequestHandler):
 
                     for p in products:
                         pid = p['id']
-                        p['name'] = p.get('brand_name') or p.get('spec_name') or ''
+                        p['name'] = p.get('brand_name') or ''
                         p['sake_type'] = p.get('category') or ''
                         p['brewery'] = p.get('brewery_name') or ''
-                        
-                        img = p.get('cropped_image_path_front')
-                        if not img:
-                            r_list = ratings_map.get(pid, [])
-                            for r_item in r_list:
-                                if r_item.get('rating_image'):
-                                    img = r_item['rating_image']
-                                    break
-                        p['cropped_image_path_front'] = get_image_as_data_url(img)
+                        p['cropped_image_path_front'] = clean_img_url(p.get('cropped_image_path_front'))
                         p['alcohol_content'] = p.get('alcohol')
                         p['awards'] = awards_map.get(pid, [])
                         p['ratings'] = ratings_map.get(pid, [])
@@ -935,23 +525,13 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps(res_payload, ensure_ascii=False).encode('utf-8'))
             except Exception as e:
                 print(f"Products API error: {e}")
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_response(500)
                 self.end_headers()
-                res_payload = {
-                    "items": [],
-                    "page": 1,
-                    "limit": limit if 'limit' in locals() else 30,
-                    "total_items": 0,
-                    "total_pages": 1,
-                    "error": str(e)
-                }
-                self.wfile.write(json.dumps(res_payload, ensure_ascii=False).encode('utf-8'))
             finally:
                 if conn: conn.close()
             return
         elif self.path.startswith("/api/recommendations"):
+            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             user_name = params.get('user', ['hitoshi'])[0]
@@ -1018,15 +598,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                         if pid not in ratings_map: ratings_map[pid] = []
                         ratings_map[pid].append(dict(r))
                     for p in top_recs:
-                        pid = p['id']
-                        p['ratings'] = ratings_map.get(pid, [])
-                        img = p.get('cropped_image_path_front')
-                        if not img:
-                            for r_item in p['ratings']:
-                                if r_item.get('rating_image'):
-                                    img = r_item['rating_image']
-                                    break
-                        p['cropped_image_path_front'] = get_image_as_data_url(img)
+                        p['ratings'] = ratings_map.get(p['id'], [])
                 
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -1040,6 +612,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
         elif self.path.startswith("/api/brewery_admin/analytics"):
+            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             brewery = params.get('brewery', ['旭酒造'])[0]
@@ -1134,6 +707,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
         elif self.path.startswith("/api/brewery_admin/products"):
+            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             brewery = params.get('brewery', [None])[0]
@@ -1161,61 +735,16 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 if conn: conn.close()
             return
 
-        elif self.path.startswith("/api/admin/breweries"):
-            parsed_url = urllib.parse.urlparse(self.path)
-            params = urllib.parse.parse_qs(parsed_url.query)
-            q = params.get('q', [''])[0].strip()
-            pref = params.get('prefecture', [''])[0].strip()
-            limit = int(params.get('limit', [100])[0])
-            offset = int(params.get('offset', [0])[0])
-
-            conn = None
-            try:
-                conn = sqlite3.connect(DB_PATH)
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-
-                where_clauses = []
-                args = []
-                if q:
-                    where_clauses.append("(name LIKE ? OR name_norm LIKE ? OR kura_name LIKE ? OR president_name LIKE ? OR toji_name LIKE ?)")
-                    like_q = f"%{q}%"
-                    args.extend([like_q, like_q, like_q, like_q, like_q])
-                if pref:
-                    where_clauses.append("prefecture = ?")
-                    args.append(pref)
-
-                where_str = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-                cursor.execute(f"SELECT COUNT(*) FROM breweries {where_str}", args)
-                total_count = cursor.fetchone()[0]
-
-                cursor.execute(f"SELECT * FROM breweries {where_str} ORDER BY id ASC LIMIT ? OFFSET ?", args + [limit, offset])
-                rows = cursor.fetchall()
-                breweries_list = [dict(r) for r in rows]
-
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"total": total_count, "breweries": breweries_list}, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                print(f"Admin breweries fetch error: {e}")
-                self.send_response(500)
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
-            finally:
-                if conn: conn.close()
-
         elif self.path.startswith("/api/brewery"):
+            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
-            b_id = params.get('id', [None])[0]
             name = params.get('name', [None])[0]
             
-            if not b_id and not name:
+            if not name:
                 self.send_response(400)
                 self.end_headers()
-                self.wfile.write(json.dumps({"error": "id or name parameter is required"}).encode('utf-8'))
+                self.wfile.write(json.dumps({"error": "name parameter is required"}).encode('utf-8'))
                 return
                 
             conn = None
@@ -1223,10 +752,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 conn = sqlite3.connect(DB_PATH)
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                if b_id:
-                    cursor.execute("SELECT * FROM breweries WHERE id = ?", (b_id,))
-                else:
-                    cursor.execute("SELECT * FROM breweries WHERE name = ? OR name_norm = ? OR kura_name = ?", (name, name, name))
+                cursor.execute("SELECT * FROM breweries WHERE name = ? OR name_norm = ?", (name, name))
                 brewery = cursor.fetchone()
                 
                 self.send_response(200)
@@ -1235,7 +761,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.end_headers()
                 
                 if brewery:
-                    self.wfile.write(json.dumps(dict(brewery), ensure_ascii=False).encode('utf-8'))
+                    self.wfile.write(json.dumps(dict(brewery)).encode('utf-8'))
                 else:
                     self.wfile.write(json.dumps({"error": "Not found"}).encode('utf-8'))
             except Exception as e:
@@ -1273,6 +799,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     conn.close()
 
         elif self.path.startswith("/api/competition"):
+            import urllib.parse
             parsed_url = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed_url.query)
             comp_id = params.get('id', [None])[0]
@@ -1347,45 +874,7 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     conn.close()
             return
         else:
-            filepath = self.translate_path(self.path)
-            if os.path.exists(filepath) and os.path.isfile(filepath):
-                try:
-                    with open(filepath, 'rb') as f:
-                        content = f.read()
-                    
-                    ext = os.path.splitext(filepath)[1].lower()
-                    content_types = {
-                        '.html': 'text/html; charset=utf-8',
-                        '.css': 'text/css; charset=utf-8',
-                        '.js': 'application/javascript; charset=utf-8',
-                        '.json': 'application/json; charset=utf-8',
-                        '.png': 'image/png',
-                        '.jpg': 'image/jpeg',
-                        '.jpeg': 'image/jpeg',
-                        '.gif': 'image/gif',
-                        '.svg': 'image/svg+xml',
-                        '.webp': 'image/webp',
-                        '.ico': 'image/x-icon'
-                    }
-                    ctype = content_types.get(ext, 'application/octet-stream')
-                    
-                    self.send_response(200)
-                    self.send_header('Content-Type', ctype)
-                    self.send_header('Content-Length', str(len(content)))
-                    self.send_header('Access-Control-Allow-Origin', '*')
-                    self.end_headers()
-                    self.wfile.write(content)
-                    return
-                except Exception as e:
-                    print(f"ファイルレスポンスエラー ({filepath}): {e}")
-                    self.send_response(500)
-                    self.end_headers()
-                    return
-            
-            self.send_response(404)
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.end_headers()
-            self.wfile.write("<h1>404 Not Found</h1>".encode('utf-8'))
+            super().do_GET()
 
     def do_POST(self):
         if self.path == "/api/login":
@@ -1405,7 +894,6 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 
                 if user:
                     u_dict = dict(user)
-                    u_dict['is_admin'] = (user['role'] in ('system_admin', 'admin', 'brewery_admin'))
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json; charset=utf-8')
                     self.send_header('Access-Control-Allow-Origin', '*')
@@ -1424,186 +912,41 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
             return
 
-        elif self.path == "/api/admin/update_product_image":
+        elif self.path == "/api/brewery_admin/info/save":
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             conn = None
             try:
                 data = json.loads(post_data.decode('utf-8'))
-                product_id = data.get('product_id')
-                image_data = data.get('image_data')
-
-                if not product_id or not image_data:
-                    self.send_response(400)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "product_id と image_data が必要です"}).encode('utf-8'))
-                    return
-
-                auto_crop = data.get('auto_crop', True)
-                saved_path = process_admin_bottle_image(image_data, product_id, auto_crop=auto_crop)
-                if not saved_path:
-                    self.send_response(400)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "画像処理に失敗しました"}).encode('utf-8'))
-                    return
-
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                cursor.execute("UPDATE products SET cropped_image_path_front = ? WHERE id = ?", (saved_path, product_id))
-                conn.commit()
-
-                invalidate_server_cache()
-
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "success", "image_path": saved_path, "message": "公式ボトル写真を更新しました！"}, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                print(f"Admin product image update error: {e}")
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
-            finally:
-                if conn: conn.close()
-            return
-
-        elif self.path in ("/api/brewery_admin/info/save", "/api/admin/brewery/save"):
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            conn = None
-            try:
-                data = json.loads(post_data.decode('utf-8'))
-                b_id = data.get('id')
-                b_name = data.get('brewery_name', data.get('name', '')).strip()
+                b_name = data.get('brewery_name', '').strip()
                 kura_name = data.get('kura_name', '').strip()
                 pref = data.get('prefecture', '').strip()
-                city = data.get('city', '').strip()
                 address = data.get('address', '').strip()
                 website = data.get('website', '').strip()
                 founded = data.get('founded_year')
-                founded_era = data.get('founded_era', '').strip()
-                era_cat = data.get('era_category', '').strip()
-                is_shinise = int(data.get('is_shinise', 0)) if data.get('is_shinise') is not None else 0
                 desc = data.get('description', '').strip()
-                
-                # 新設カラム
-                phone = data.get('phone', '').strip()
-                fax = data.get('fax', '').strip()
-                president_name = data.get('president_name', '').strip()
-                toji_name = data.get('toji_name', '').strip()
-                opening_hours = data.get('opening_hours', '').strip()
-                regular_holiday = data.get('regular_holiday', '').strip()
-                parking_info = data.get('parking_info', '').strip()
-                access_info = data.get('access_info', '').strip()
-                official_ec_url = data.get('official_ec_url', '').strip()
-                sns_instagram = data.get('sns_instagram', '').strip()
-                sns_facebook = data.get('sns_facebook', '').strip()
-                sns_twitter = data.get('sns_twitter', '').strip()
-                main_rice_varieties = data.get('main_rice_varieties', '').strip()
-                brewing_features = data.get('brewing_features', '').strip()
-                water_source_name = data.get('water_source_name', '').strip()
-                water_hardness_type = data.get('water_hardness_type', '').strip()
-                toji_guild = data.get('toji_guild', '').strip()
-                tour_info = data.get('tour_info', '').strip()
-                has_tasting = int(data.get('has_tasting', 0)) if data.get('has_tasting') is not None else 0
-                has_cafe = int(data.get('has_cafe_restaurant', 0)) if data.get('has_cafe_restaurant') is not None else 0
-                is_cult = int(data.get('is_cultural_property', 0)) if data.get('is_cultural_property') is not None else 0
-                cult_desc = data.get('cultural_property_desc', '').strip()
-                visit_allow = int(data.get('visitation_allowed', 0)) if data.get('visitation_allowed') is not None else 0
-                shop_avail = int(data.get('shop_available', 0)) if data.get('shop_available') is not None else 0
                 now = datetime.now().isoformat()
                 
-                if not b_name and not b_id:
+                if not b_name:
                     self.send_response(400)
                     self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "酒蔵名またはIDが必要です"}).encode('utf-8'))
+                    self.wfile.write(json.dumps({"status": "error", "message": "酒蔵名が必要です"}).encode('utf-8'))
                     return
                     
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
-                
-                if b_id:
-                    cursor.execute("""
-                        UPDATE breweries
-                        SET name = COALESCE(NULLIF(?, ''), name),
-                            kura_name = ?, prefecture = ?, city = ?, address = ?, website = ?,
-                            founded_year = ?, founded_era = ?, era_category = ?, is_shinise = ?,
-                            description = ?, phone = ?, fax = ?, president_name = ?, toji_name = ?,
-                            opening_hours = ?, regular_holiday = ?, parking_info = ?, access_info = ?,
-                            official_ec_url = ?, sns_instagram = ?, sns_facebook = ?, sns_twitter = ?,
-                            main_rice_varieties = ?, brewing_features = ?, water_source_name = ?,
-                            water_hardness_type = ?, toji_guild = ?, tour_info = ?, has_tasting = ?,
-                            has_cafe_restaurant = ?, is_cultural_property = ?, cultural_property_desc = ?,
-                            visitation_allowed = ?, shop_available = ?, updated_at = ?
-                        WHERE id = ?
-                    """, (
-                        b_name, kura_name, pref, city, address, website,
-                        founded, founded_era, era_cat, is_shinise,
-                        desc, phone, fax, president_name, toji_name,
-                        opening_hours, regular_holiday, parking_info, access_info,
-                        official_ec_url, sns_instagram, sns_facebook, sns_twitter,
-                        main_rice_varieties, brewing_features, water_source_name,
-                        water_hardness_type, toji_guild, tour_info, has_tasting,
-                        has_cafe, is_cult, cult_desc,
-                        visit_allow, shop_avail, now,
-                        b_id
-                    ))
-                else:
-                    cursor.execute("""
-                        INSERT INTO breweries (
-                            name, kura_name, prefecture, city, address, website,
-                            founded_year, founded_era, era_category, is_shinise,
-                            description, phone, fax, president_name, toji_name,
-                            opening_hours, regular_holiday, parking_info, access_info,
-                            official_ec_url, sns_instagram, sns_facebook, sns_twitter,
-                            main_rice_varieties, brewing_features, water_source_name,
-                            water_hardness_type, toji_guild, tour_info, has_tasting,
-                            has_cafe_restaurant, is_cultural_property, cultural_property_desc,
-                            visitation_allowed, shop_available, created_at, updated_at
-                        ) VALUES (
-                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-                        ) ON CONFLICT(name) DO UPDATE SET
-                            kura_name=excluded.kura_name, prefecture=excluded.prefecture, city=excluded.city,
-                            address=excluded.address, website=excluded.website, founded_year=excluded.founded_year,
-                            founded_era=excluded.founded_era, era_category=excluded.era_category, is_shinise=excluded.is_shinise,
-                            description=excluded.description, phone=excluded.phone, fax=excluded.fax,
-                            president_name=excluded.president_name, toji_name=excluded.toji_name,
-                            opening_hours=excluded.opening_hours, regular_holiday=excluded.regular_holiday,
-                            parking_info=excluded.parking_info, access_info=excluded.access_info,
-                            official_ec_url=excluded.official_ec_url, sns_instagram=excluded.sns_instagram,
-                            sns_facebook=excluded.sns_facebook, sns_twitter=excluded.sns_twitter,
-                            main_rice_varieties=excluded.main_rice_varieties, brewing_features=excluded.brewing_features,
-                            water_source_name=excluded.water_source_name, water_hardness_type=excluded.water_hardness_type,
-                            toji_guild=excluded.toji_guild, tour_info=excluded.tour_info, has_tasting=excluded.has_tasting,
-                            has_cafe_restaurant=excluded.has_cafe_restaurant, is_cultural_property=excluded.is_cultural_property,
-                            cultural_property_desc=excluded.cultural_property_desc, visitation_allowed=excluded.visitation_allowed,
-                            shop_available=excluded.shop_available, updated_at=excluded.updated_at
-                    """, (
-                        b_name, kura_name, pref, city, address, website,
-                        founded, founded_era, era_cat, is_shinise,
-                        desc, phone, fax, president_name, toji_name,
-                        opening_hours, regular_holiday, parking_info, access_info,
-                        official_ec_url, sns_instagram, sns_facebook, sns_twitter,
-                        main_rice_varieties, brewing_features, water_source_name,
-                        water_hardness_type, toji_guild, tour_info, has_tasting,
-                        has_cafe, is_cult, cult_desc,
-                        visit_allow, shop_avail, now, now
-                    ))
+                cursor.execute("INSERT INTO breweries (name, kura_name, prefecture, address, website, founded_year, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(name) DO UPDATE SET kura_name=excluded.kura_name, prefecture=excluded.prefecture, address=excluded.address, website=excluded.website, founded_year=excluded.founded_year, description=excluded.description, updated_at=excluded.updated_at", (b_name, kura_name, pref, address, website, founded, desc, now, now))
                 conn.commit()
-                invalidate_server_cache()
                 
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json; charset=utf-8')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                self.wfile.write(json.dumps({"status": "success", "message": "酒蔵情報を正常に保存しました"}).encode('utf-8'))
+                self.wfile.write(json.dumps({"status": "success", "message": "酒蔵基本情報を保存しました"}).encode('utf-8'))
             except Exception as e:
                 print(f"Brewery info save error: {e}")
                 self.send_response(500)
                 self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode('utf-8'))
             finally:
                 if conn: conn.close()
             return
@@ -1848,16 +1191,43 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
                 
-                cursor.execute("""
-                    INSERT INTO user_flavor_ratings (
-                        product_id, ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, user_name, user_id, created_at,
-                        total_score, taste_score, aroma_score
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (product_id, ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, user_name, user_id, datetime.now().isoformat(),
-                      total_score, taste_score, aroma_score))
+                if user_name == "hitocie":
+                    cursor.execute("SELECT id FROM user_flavor_ratings WHERE product_id = ? AND user_name = 'hitocie'", (product_id,))
+                    existing = cursor.fetchone()
+                    if existing:
+                        cursor.execute("""
+                            UPDATE user_flavor_ratings SET
+                                ssi_type = ?,
+                                body_level = ?,
+                                aroma_level = ?,
+                                comment = ?,
+                                rating_image = ?,
+                                rating_image_2 = ?,
+                                created_at = ?,
+                                total_score = ?,
+                                taste_score = ?,
+                                aroma_score = ?
+                            WHERE product_id = ? AND user_name = 'hitocie'
+                        """, (ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, datetime.now().isoformat(),
+                              total_score, taste_score, aroma_score, product_id))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO user_flavor_ratings (
+                                product_id, ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, user_name, user_id, created_at,
+                                total_score, taste_score, aroma_score
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (product_id, ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, user_name, user_id, datetime.now().isoformat(),
+                              total_score, taste_score, aroma_score))
+                else:
+                    cursor.execute("""
+                        INSERT INTO user_flavor_ratings (
+                            product_id, ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, user_name, user_id, created_at,
+                            total_score, taste_score, aroma_score
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (product_id, ssi_type, body_level, aroma_level, comment, rating_image, rating_image_2, user_name, user_id, datetime.now().isoformat(),
+                          total_score, taste_score, aroma_score))
                 
                 conn.commit()
-                invalidate_server_cache()
                 print("[DEBUG] Transaction committed successfully.")
                 
             except Exception as e:
@@ -2136,138 +1506,6 @@ class SakeApiServer(SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps(response).encode('utf-8'))
                 except Exception as send_error:
                     print(f"レスポンス送信失敗: {str(send_error)}")
-        elif self.path == "/api/search-by-label":
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            
-            try:
-                data = json.loads(post_data.decode('utf-8'))
-                image_base64 = data.get('image')
-                
-                if not image_base64:
-                    raise Exception("画像データが送られていません。")
-                
-                print("[AI Label Search] 表ラベル画像をGemini Visionで解析中...")
-                ai_result = analyze_front_label_with_gemini(image_base64)
-                
-                conn = sqlite3.connect(DB_PATH)
-                conn.row_factory = sqlite3.Row
-                
-                if ai_result:
-                    print(f"[AI Label Search] AI抽出結果: {ai_result}")
-                    matched_products = search_products_by_ai_label(conn, ai_result)
-                else:
-                    print("[AI Label Search] AI解析がスキップ/エラーのため、全件または最新の銘柄を検索フォールバック")
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        SELECT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture
-                        FROM products p
-                        LEFT JOIN breweries b ON p.brewery_name LIKE '%' || b.name || '%' OR b.name LIKE '%' || p.brewery_name || '%'
-                        ORDER BY p.id DESC LIMIT 10
-                    """)
-                    rows = cursor.fetchall()
-                    matched_products = [dict(r) for r in rows]
-                    for p in matched_products:
-                        p['match_score'] = 10
-                    ai_result = {
-                        "brand_name": "（AI解析不可/未設定）",
-                        "brewery_name": "",
-                        "spec_name": "",
-                        "keywords": []
-                    }
-                
-                conn.close()
-                
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                
-                res_payload = {
-                    "status": "success",
-                    "ai_analysis": ai_result,
-                    "products": matched_products
-                }
-                self.wfile.write(json.dumps(res_payload, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                print(f"[AI Label Search] エラー発生: {e}")
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False).encode('utf-8'))
-        elif self.path == "/api/product/create-and-rate":
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            conn = None
-            try:
-                data = json.loads(post_data.decode('utf-8'))
-                brand_name = (data.get('brand_name') or '').strip()
-                brewery_name = (data.get('brewery_name') or '').strip()
-                spec_name = (data.get('spec_name') or '').strip()
-                prefecture = (data.get('prefecture') or '').strip()
-                image_base64 = data.get('image')
-                
-                comment = data.get('comment', '')
-                total_score = data.get('total_score', 4.0)
-                taste_score = data.get('taste_score', 4.0)
-                aroma_score = data.get('aroma_score', 4.0)
-                ssi_type = data.get('ssi_type', '薫酒')
-                body_level = data.get('body_level', 3)
-                aroma_level = data.get('aroma_level', 3)
-                user_name = data.get('user_name', '匿名')
-                user_id = data.get('user_id', 'user_registered')
-                
-                if not brand_name:
-                    raise Exception("銘柄名は必須です。")
-                
-                saved_image_path = None
-                if image_base64:
-                    saved_image_path = save_base64_image(image_base64, f"new_prod_{user_name}")
-                
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                
-                cursor.execute("""
-                    INSERT INTO products (brand_name, brewery_name, spec_name, prefecture, cropped_image_path_front)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (brand_name, brewery_name, spec_name, prefecture, saved_image_path))
-                
-                product_id = cursor.lastrowid
-                
-                cursor.execute("""
-                    INSERT INTO user_flavor_ratings (
-                        product_id, ssi_type, body_level, aroma_level, comment, rating_image, user_name, user_id, created_at,
-                        total_score, taste_score, aroma_score
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (product_id, ssi_type, body_level, aroma_level, comment, saved_image_path, user_name, user_id, datetime.now().isoformat(),
-                      total_score, taste_score, aroma_score))
-                
-                conn.commit()
-                invalidate_server_cache()
-                print(f"[Create & Rate] 新規製品ID {product_id} ('{brand_name}') とレビューを登録しました。")
-                
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                
-                res_payload = {
-                    "status": "success",
-                    "product_id": product_id,
-                    "message": "新しい日本酒とレビューを保存しました。"
-                }
-                self.wfile.write(json.dumps(res_payload, ensure_ascii=False).encode('utf-8'))
-            except Exception as e:
-                print(f"[Create & Rate] エラー: {e}")
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json; charset=utf-8')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False).encode('utf-8'))
-            finally:
-                if conn:
-                    conn.close()
         elif self.path == "/api/product/import-csv":
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)

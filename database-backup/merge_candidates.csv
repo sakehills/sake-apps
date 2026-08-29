@@ -1,0 +1,32 @@
+﻿id,entity,keep_id,merge_id,reason,score,decided
+1,brewery,228,266,加藤酒造株式会社(上越市)と有限会社加藤酒造店(佐渡市)は所在地が異なる別法人。法人番号は両者ともnullのためAPI突合不可、住所で判定。,0.889,separate
+2,brewery,232,301,関原酒造株式会社(長岡市)と原酒造株式会社(柏崎市)は所在地が異なる別法人。法人番号は両者ともnullのためAPI突合不可、住所で判定。,0.857,separate
+3,brewery,240,301,田原酒造株式会社(糸魚川市)と原酒造株式会社(柏崎市)は所在地が異なる別法人。法人番号は両者ともnullのためAPI突合不可、住所で判定。,0.857,separate
+4,brewery,548,558,秋田酒造株式会社(秋田市/秋田晴)と秋田誉酒造株式会社(由利本荘市/秋田誉)は所在地・銘柄が異なる別法人。法人番号は両者ともnullのためAPI突合不可、住所で判定。,0.889,separate
+5,brewery,946,991,合資会社後藤酒造場(八女市黒木町/金襴藤娘)と後藤酒造合資会社(豊前市/求菩提)は所在地・銘柄が異なる別法人（同姓による偶然の類似名）。法人番号は両者ともnullのためAPI突合不可、住所で判定。,0.889,separate
+6,brewery,2147,2166,原酒造場(郡上市白鳥町/元文)と（有）原田酒造場(高山市/山車)は所在地・銘柄が異なる別法人。法人番号は両者ともnullのためAPI突合不可、住所で判定。,0.889,separate
+7,brewery,4108,4113,小澤酒造株式会社(青梅市/澤乃井)と有限会社小澤酒造場(八王子市/桑乃都)は所在地・銘柄が異なる別法人（同姓による偶然の類似）。法人番号は両者ともnullのためAPI突合不可、住所で判定。,0.889,separate
+8,brewery,6749,6742,土佐酒造(安田町/桂月/keigetsu.co.jp)と土佐鶴酒造(安芸郡安田町/土佐鶴/tosatsuru.co.jp)は銘柄・公式サイトが異なる別法人（類似名による偶然の一致）。法人番号は両者ともnullのためAPI突合不可。,0.889,separate
+9,brewery,6889,6895,松の露酒造株式会社(日南市/松の露)と松露酒造株式会社(串間市/松露)は所在地・公式サイトが異なる別法人（類似名による偶然の一致）。法人番号は両者ともnullのためAPI突合不可。,0.889,separate
+10,brewery,5792,3233,公式サイト会社概要(choryo.jp/company)・Wikipedia・日本酒造組合中央会「酒蔵検索」で同一法人と確認。本社=奈良県広陵町(広陵蔵)、大阪府八尾市は製造拠点(八尾蔵)。銘柄が部分集合関係にあったことも傍証。実削除はせずstatus=rejectedで監査痕跡を残した。2026-07-19,1.0,merged
+11,brewery,226,36987,03_normalize.pyが過去の全staged jsonlを毎回再処理する仕様のため、リネーム済み蔵の旧名称レコードが再生成された。同一法人であることは明白（住所・法人番号・銘柄が完全一致）。,1.0,merged
+12,brewery,57925,60307,銘柄拡充バッチのJSONLが新字体「高」を使用したのに対し、初回投入時のカスタムローダーが旧字体「髙」のまま正規化せず登録したため、03_normalize.pyの正規化(髙→高)適用時に別レコードとして再生成された。,1.0,merged
+13,brewery,57786,65964,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+14,brewery,57798,65972,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+15,brewery,57799,65973,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+16,brewery,57802,65975,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+17,brewery,57803,65976,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+18,brewery,57804,65977,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+19,brewery,57805,65978,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+20,brewery,57822,65988,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+21,brewery,57826,65991,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+22,brewery,57827,65992,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+23,brewery,57837,65997,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+24,brewery,57839,65998,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+25,brewery,57843,66001,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+26,brewery,57863,66015,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+27,brewery,5526,65902,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+28,brewery,3443,65882,独自ローダー(load_kagoshima_shochu.py等)のnorm_name()が03_normalize.pyの内部空白除去(または旧字体変換)と食い違い、round14銘柄拡充バッチが正しいnorm_name()で再処理したことで重複レコードが生成された。既存id側へ銘柄を移管しrejected化、既存id側のname_normも正規のものへ修正。,1.0,merged
+29,brewery,57765,65945,新規銘柄0件の重複。keep_idは便宜上57765(指宿市)としたが実質的には57765/57813どちらとも無関係な空データの除去。,1.0,merged
+30,brewery,3443,70732,古いstaged jsonlの再処理による重複再発生(round14と同一原因),1.0,merged
+31,brewery,5526,70752,古いstaged jsonlの再処理による重複再発生(round14と同一原因),1.0,merged

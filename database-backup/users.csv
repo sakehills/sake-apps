@@ -1,0 +1,9 @@
+﻿id,user_id,password,user_name,role,assigned_brewery,created_at
+1,admin,password,システム管理者,system_admin,,2026-08-02 03:16:46
+2,dassai_admin,password,獺祭(旭酒造) 管理者,brewery_admin,旭酒造,2026-08-02 03:16:46
+3,hakkai_admin,password,八海山(八海醸造) 管理者,brewery_admin,八海醸造,2026-08-02 03:16:46
+4,user1,password,日本酒ファン太郎,user,,2026-08-02 03:16:46
+5,hitoshi,password,hitoshi,user,,2026-08-02 03:32:07
+6,user2,password,user2,user,,2026-08-02 03:32:07
+7,user3,password,user3,user,,2026-08-02 03:32:07
+8,nao,password,nao,user,,2026-08-02 04:30:47
