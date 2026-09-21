@@ -253,7 +253,7 @@ def analyze_front_label_with_gemini(image_base64):
 
 
 def search_products_by_ai_label(conn, ai_data):
-    """AI抽出結果（銘柄名・酒蔵名・スペック等）を元にDB（productsテーブル）を検索しスコアリングして返却する"""
+    """AI抽出結果（銘柄名・酒蔵名・スペック等）を元にDB（productsテーブル）を検索し高精度スコアリングして返却する"""
     if not ai_data:
         return []
     
@@ -264,20 +264,50 @@ def search_products_by_ai_label(conn, ai_data):
 
     cursor = conn.cursor()
     
+    brewery_clean = brewery.replace('株式会社', '').replace('株式會社', '').replace('有限会社', '').replace('合名会社', '').replace('合資会社', '').strip()
+
+    # 汎用スペック単語（全国の酒に共通するワード）はOR条件で無制限に拾わないように除外/区別
+    GENERIC_WORDS = {'純米大吟醸', '純米吟醸', '大吟醸', '純米酒', '特別純米', '特別本醸造', '本醸造', '普通酒', '清酒', '生酒', '原酒', '生貯蔵酒', '生詰', 'にごり酒', 'スパークリング', '日本酒'}
+
+    # 検索キーの整理
+    search_terms = set()
+    if brand:
+        search_terms.add(brand)
+        for part in brand.replace('　', ' ').split(' '):
+            if len(part) >= 2:
+                search_terms.add(part)
+    
+    if spec:
+        for part in spec.replace('　', ' ').split(' '):
+            if len(part) >= 2 and part not in GENERIC_WORDS:
+                search_terms.add(part)
+
+    specific_keywords = [k for k in keywords if isinstance(k, str) and len(k) >= 2 and k not in GENERIC_WORDS]
+
     query_parts = []
     params = []
 
-    if brand:
-        query_parts.append("p.brand_name LIKE ?")
-        params.append(f"%{brand}%")
-    brewery_clean = brewery.replace('株式会社', '').replace('株式會社', '').replace('有限会社', '').replace('合名会社', '').replace('合資会社', '').strip()
+    # 1. ブランド名によるマッチ（部分一致・双方向）
+    for term in search_terms:
+        query_parts.append("(p.brand_name LIKE ? OR p.spec_name LIKE ? OR ? LIKE '%' || p.brand_name || '%')")
+        params.extend([f"%{term}%", f"%{term}%", term])
+
+    # 2. 酒蔵名によるマッチ
     if brewery_clean:
-        query_parts.append("p.brewery_name LIKE ? OR b.name LIKE ?")
+        query_parts.append("(p.brewery_name LIKE ? OR b.name LIKE ?)")
         params.extend([f"%{brewery_clean}%", f"%{brewery_clean}%"])
-    for kw in keywords:
-        if isinstance(kw, str) and len(kw) >= 2 and kw not in (brand, brewery):
-            query_parts.append("(p.brand_name LIKE ? OR p.spec_name LIKE ? OR p.brewery_name LIKE ?)")
-            params.extend([f"%{kw}%", f"%{kw}%", f"%{kw}%"])
+
+    # 3. 特徴的キーワード（汎用単語以外）
+    for kw in specific_keywords:
+        if kw not in search_terms:
+            query_parts.append("(p.brand_name LIKE ? OR p.spec_name LIKE ?)")
+            params.extend([f"%{kw}%", f"%{kw}%"])
+
+    if not query_parts:
+        for kw in keywords:
+            if isinstance(kw, str) and len(kw) >= 2:
+                query_parts.append("(p.spec_name LIKE ?)")
+                params.append(f"%{kw}%")
 
     if not query_parts:
         cursor.execute("""
@@ -292,16 +322,26 @@ def search_products_by_ai_label(conn, ai_data):
             item['match_score'] = 10
         return results
 
+    # SQL段階でブランド名や酒蔵名にマッチするものを優先して上位100件取得
+    safe_brand = brand.replace("'", "''")
     sql = f"""
         SELECT DISTINCT p.*, COALESCE(p.prefecture, b.prefecture, '') as display_prefecture
         FROM products p
         LEFT JOIN breweries b ON p.brewery_name LIKE '%' || b.name || '%' OR b.name LIKE '%' || p.brewery_name || '%'
         WHERE {" OR ".join(query_parts)}
-        LIMIT 50
+        ORDER BY 
+            CASE 
+                WHEN p.brand_name = '{safe_brand}' THEN 1
+                WHEN p.brand_name LIKE '%{safe_brand}%' THEN 2
+                WHEN p.spec_name LIKE '%{safe_brand}%' THEN 3
+                ELSE 4
+            END ASC,
+            p.id DESC
+        LIMIT 100
     """
     cursor.execute(sql, params)
     rows = cursor.fetchall()
-    
+
     results = []
     for r in rows:
         item = dict(r)
@@ -309,31 +349,45 @@ def search_products_by_ai_label(conn, ai_data):
         p_brand = item.get('brand_name') or ''
         p_brewery = item.get('brewery_name') or ''
         p_spec = item.get('spec_name') or ''
-        
+
+        # ブランド名スコア
         if brand:
             if brand == p_brand:
                 score += 50
             elif brand in p_brand or p_brand in brand:
                 score += 35
-        
+            elif brand in p_spec:
+                score += 30
+
+        # 酒蔵名スコア
         if brewery_clean:
             if brewery_clean == p_brewery:
                 score += 30
             elif brewery_clean in p_brewery or p_brewery in brewery_clean:
                 score += 20
-                
+
+        # スペックスコア
         if spec:
-            if spec in p_spec or p_spec in spec:
-                score += 15
-                
+            if spec in p_spec:
+                score += 30
+            elif p_spec in spec:
+                score += 20
+            else:
+                for part in spec.split(' '):
+                    if len(part) >= 2 and part in p_spec:
+                        score += 15
+
+        # キーワードスコア
         for kw in keywords:
             if isinstance(kw, str) and len(kw) >= 2:
-                if kw in p_brand or kw in p_brewery or kw in p_spec:
+                if kw in p_spec:
+                    score += 10
+                elif kw in p_brand:
                     score += 5
 
         item['match_score'] = score
         results.append(item)
-        
+
     results.sort(key=lambda x: x['match_score'], reverse=True)
     return results[:10]
 
