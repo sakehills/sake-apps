@@ -1297,8 +1297,12 @@ document.addEventListener('DOMContentLoaded', initAuth);
 
 
     <div class="controls-container">
-        <div class="search-box">
-            <input type="text" id="searchInput" placeholder="銘柄名、酒蔵名などで検索...">
+        <div class="search-box" style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="searchInput" placeholder="銘柄名、酒蔵名などで検索..." style="flex: 1;">
+            <button class="label-search-btn" id="openLabelSearchBtn" onclick="triggerLabelCamera()">
+                📷 AIラベル検索
+            </button>
+            <input type="file" id="labelCameraInput" accept="image/*" capture="environment" style="display: none;" onchange="handleLabelImageSelect(event)">
         </div>
         <div class="filter-group">
             <div class="select-wrapper">
@@ -1435,22 +1439,6 @@ document.addEventListener('DOMContentLoaded', initAuth);
                             <td id="detServingTemp" style="color: var(--text-main); font-weight: 700;">-</td>
                         </tr>
                         <tr>
-                            <th>お祝い・ギフトシーン</th>
-                            <td id="detCelebration" style="color: #f59e0b; font-weight: 600;">-</td>
-                        </tr>
-                        <tr>
-                            <th>ギフト包装仕様</th>
-                            <td id="detGiftPkg" style="color: var(--text-main);">-</td>
-                        </tr>
-                        <tr>
-                            <th>香りの特長 (アロマ)</th>
-                            <td id="detAromaNotes" style="color: #f472b6;">-</td>
-                        </tr>
-                        <tr>
-                            <th>味わいの特長 (テイスト)</th>
-                            <td id="detTasteProfile" style="color: #38bdf8;">-</td>
-                        </tr>
-                        <tr>
                             <th>酒蔵住所</th>
                             <td id="detAddress">-</td>
                         </tr>
@@ -1506,11 +1494,8 @@ document.addEventListener('DOMContentLoaded', initAuth);
                     </div>
 
                     <div style="margin-top: 1.5rem;">
-                        <div style="font-size: 0.85rem; color: var(--accent); margin-bottom: 0.5rem; font-weight: 700;">📖 銘柄の由来・誕生ストーリー</div>
-                        <div class="sake-description-box" id="detBrandStory" style="margin-bottom: 1.2rem; line-height: 1.6; color: #e2e8f0;">-</div>
-                        
-                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 700;">📝 味わい・特徴の総合解説</div>
-                        <div class="sake-description-box" id="detComment" style="line-height: 1.6;">-</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 700;">味わい・特徴の説明</div>
+                        <div class="sake-description-box" id="detComment">-</div>
                     </div>
                 </div>
             </div>
@@ -1853,6 +1838,18 @@ document.addEventListener('DOMContentLoaded', initAuth);
     </div>
 
     <script>
+        function clean_img_url(url) {
+            if (!url) return '';
+            let s = String(url).replace(/\\/g, '/').strip ? String(url).replace(/\\/g, '/').trim() : String(url);
+            if (s.startsWith('data:image/')) return s;
+            let idx = s.indexOf('cropped_images');
+            if (idx !== -1) return '/' + s.substring(idx);
+            let idxUp = s.indexOf('uploaded_images');
+            if (idxUp !== -1) return '/' + s.substring(idxUp);
+            if (!s.startsWith('/') && !s.startsWith('http')) return '/' + s;
+            return s;
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const searchInput = document.getElementById('searchInput');
             const breweryFilter = document.getElementById('breweryFilter');
@@ -1861,7 +1858,17 @@ document.addEventListener('DOMContentLoaded', initAuth);
             const imageFilter = document.getElementById('imageFilter');
             const sortOrder = document.getElementById('sortOrder');
             
-            if (searchInput) searchInput.addEventListener('input', filterData);
+            if (searchInput) {
+                searchInput.addEventListener('input', filterData);
+                searchInput.addEventListener('change', filterData);
+                searchInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        filterData();
+                        searchInput.blur();
+                    }
+                });
+            }
             if (breweryFilter) breweryFilter.addEventListener('change', filterData);
             if (typeFilter) typeFilter.addEventListener('change', filterData);
             if (ssiFilter) ssiFilter.addEventListener('change', filterData);
@@ -2030,12 +2037,6 @@ function openModal(item) {
     const detIsGenshu = document.getElementById('detIsGenshu');
     const detBrewingMethod = document.getElementById('detBrewingMethod');
     const detServingTemp = document.getElementById('detServingTemp');
-    const detCelebration = document.getElementById('detCelebration');
-    const detGiftPkg = document.getElementById('detGiftPkg');
-    const detAromaNotes = document.getElementById('detAromaNotes');
-    const detTasteProfile = document.getElementById('detTasteProfile');
-    const detBrandStory = document.getElementById('detBrandStory');
-    const detComment = document.getElementById('detComment');
     const detAddress = document.getElementById('detAddress');
     const detJanCode = document.getElementById('detJanCode');
 
@@ -2058,12 +2059,6 @@ function openModal(item) {
     if (detIsGenshu) detIsGenshu.textContent = item.is_genshu ? '原酒' : '加水調整';
     if (detBrewingMethod) detBrewingMethod.textContent = item.brewing_method || '-';
     if (detServingTemp) detServingTemp.textContent = item.serving_temperature || '-';
-    if (detCelebration) detCelebration.textContent = item.celebration_scenes || '-';
-    if (detGiftPkg) detGiftPkg.textContent = item.gift_packaging || '-';
-    if (detAromaNotes) detAromaNotes.textContent = item.aroma_notes || '-';
-    if (detTasteProfile) detTasteProfile.textContent = item.taste_profile || '-';
-    if (detBrandStory) detBrandStory.textContent = item.brand_story || '-';
-    if (detComment) detComment.textContent = item.product_description || item.comment || '-';
     if (detAddress) detAddress.textContent = item.prefecture || '-';
     if (detJanCode) detJanCode.textContent = item.jan_code || '-';
 
@@ -2186,7 +2181,621 @@ function updateNavLinksForRole() {
     navContainer.innerHTML = navHtml;
 }
 document.addEventListener('DOMContentLoaded', updateNavLinksForRole);
+
+// AI Label Search Handlers for PC/Tablet Viewer
+function triggerLabelCamera() {
+    const input = document.getElementById('labelCameraInput');
+    if (input) input.click();
+}
+
+async function handleLabelImageSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    openAiLabelModal();
+    
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const base64Data = e.target.result;
+        renderAiLabelScanningState(base64Data);
+        await executeLabelSearch(base64Data);
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+}
+
+function openAiLabelModal() {
+    const modal = document.getElementById('aiLabelModal');
+    if (modal) modal.classList.add('active');
+}
+
+function closeAiLabelModal() {
+    const modal = document.getElementById('aiLabelModal');
+    if (modal) modal.classList.remove('active');
+}
+
+function renderAiLabelScanningState(imageSrc) {
+    const body = document.getElementById('aiLabelModalBody');
+    if (!body) return;
+    body.innerHTML = `
+        <div class="ai-scanning-box">
+            <img src="${imageSrc}" class="ai-scanning-img">
+            <div class="ai-scan-line"></div>
+        </div>
+        <div style="text-align: center; padding: 16px 0;">
+            <div style="font-size: 16px; font-weight: 700; color: #818cf8; margin-bottom: 6px;">
+                AIがラベルを高度解析中...
+            </div>
+            <div style="font-size: 12px; color: #94a3b8;">
+                銘柄名・酒蔵・特定名称を検出してデータベースと照合しています
+            </div>
+        </div>
+    `;
+}
+
+async function executeLabelSearch(base64Data) {
+    const body = document.getElementById('aiLabelModalBody');
+    try {
+        const res = await fetch('/api/search-by-label', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64Data })
+        });
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            renderAiLabelResults(data.ai_analysis, data.products, base64Data);
+        } else {
+            throw new Error(data.message || 'AI解析エラー');
+        }
+    } catch (err) {
+        console.error('Label search failed:', err);
+        if (body) {
+            body.innerHTML = `
+                <div style="text-align: center; padding: 30px 10px;">
+                    <div style="font-size: 40px; margin-bottom: 12px;">⚠️</div>
+                    <div style="font-size: 15px; font-weight: 700; color: #f87171; margin-bottom: 8px;">
+                        解析に失敗しました
+                    </div>
+                    <div style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">
+                        ${err.message || 'ラベル画像から文字を正常に認識できませんでした。'}
+                    </div>
+                    <button onclick="triggerLabelCamera()" class="label-search-btn" style="margin: 0 auto;">
+                        📷 再度撮影する
+                    </button>
+                </div>
+            `;
+        }
+    }
+}
+
+let lastAiAnalysisResult = null;
+let lastLabelSearchBase64 = null;
+
+function renderAiLabelResults(ai, products, imageSrc) {
+    lastAiAnalysisResult = ai;
+    lastLabelSearchBase64 = imageSrc;
+
+    const body = document.getElementById('aiLabelModalBody');
+    if (!body) return;
+    
+    let tagsHtml = '';
+    if (ai && ai.brand_name) tagsHtml += `<span class="ai-tag brand">🏷️ ${ai.brand_name}</span>`;
+    if (ai && ai.brewery_name) tagsHtml += `<span class="ai-tag">🍶 ${ai.brewery_name}</span>`;
+    if (ai && ai.spec_name) tagsHtml += `<span class="ai-tag">✨ ${ai.spec_name}</span>`;
+    if (ai && ai.keywords && Array.isArray(ai.keywords)) {
+        ai.keywords.forEach(k => {
+            if (k) tagsHtml += `<span class="ai-tag"># ${k}</span>`;
+        });
+    }
+
+    let cardsHtml = '';
+    if (products && products.length > 0) {
+        cardsHtml = products.map((p, idx) => {
+            const matchScore = p.match_score || 0;
+            const badge = idx === 0 && matchScore >= 35 ? '👑 最も一致' : (matchScore > 15 ? '✨ 候補' : '');
+            const badgeHtml = badge ? `<span class="vivino-match-badge">${badge}</span>` : '';
+            const imgUrl = p.cropped_image_path_front || p.image_url || '';
+            const imgTag = imgUrl ? `<img src="${imgUrl}" class="vivino-card-img">` : `<div class="vivino-card-img" style="display:flex;align-items:center;justify-content:center;font-size:24px;">🍶</div>`;
+            
+            return `
+                <div class="vivino-card" onclick="selectVivinoProduct(${p.id})">
+                    ${imgTag}
+                    <div class="vivino-card-info">
+                        ${badgeHtml}
+                        <div class="vivino-card-title">${p.brand_name || '銘柄名不明'}</div>
+                        <div class="vivino-card-sub">${p.brewery_name || ''} (${p.display_prefecture || p.prefecture || ''})</div>
+                        <div class="vivino-card-sub" style="font-size: 11px; color: #cbd5e1; margin-top:2px;">${p.spec_name || ''}</div>
+                    </div>
+                    <div class="vivino-card-arrow">›</div>
+                </div>
+            `;
+        }).join('');
+    } else {
+        cardsHtml = `
+            <div style="text-align: center; padding: 20px; color: #94a3b8; font-size: 13px;">
+                該当する日本酒がデータベースに見つかりませんでした。
+            </div>
+        `;
+    }
+
+    body.innerHTML = `
+        <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 14px; background: rgba(15, 23, 42, 0.4); padding: 8px; border-radius: 12px;">
+            <img src="${imageSrc}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; flex-shrink: 0;">
+            <div>
+                <div style="font-size: 12px; color: #94a3b8;">AI認識キーワード</div>
+                <div class="ai-tags-container" style="margin-top: 4px; margin-bottom: 0;">
+                    ${tagsHtml || '<span class="ai-tag">文字検出なし</span>'}
+                </div>
+            </div>
+        </div>
+        
+        <div style="font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span>🔍 照合された銘柄 (${products ? products.length : 0}件)</span>
+            <button onclick="triggerLabelCamera()" style="background:none; border:none; color:#818cf8; font-size:12px; cursor:pointer;">📷 再撮影</button>
+        </div>
+        
+        <div class="vivino-result-list">
+            ${cardsHtml}
+        </div>
+
+        <div style="margin-top: 18px; padding-top: 14px; border-top: 1px dashed rgba(255,255,255,0.15); text-align: center;">
+            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">該当する日本酒が選択肢にありませんか？</div>
+            <button class="label-search-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 100%; justify-content: center; padding: 10px; font-size: 14px;" onclick="openNewProductRegisterModal()">
+                ➕ この日本酒を新しく登録・レビューする
+            </button>
+        </div>
+    `;
+}
+
+function selectVivinoProduct(productId) {
+    closeAiLabelModal();
+    if (typeof showModal === 'function') {
+        showModal(productId);
+    }
+}
+
+function openNewProductRegisterModal() {
+    closeAiLabelModal();
+    const modal = document.getElementById('newProductRegisterModal');
+    if (!modal) return;
+    
+    const imgPreview = document.getElementById('newProdImgPreview');
+    const brandInput = document.getElementById('newProdBrandName');
+    const breweryInput = document.getElementById('newProdBreweryName');
+    const specInput = document.getElementById('newProdSpecName');
+    const prefInput = document.getElementById('newProdPrefecture');
+    const commentInput = document.getElementById('newProdComment');
+
+    if (imgPreview) imgPreview.src = lastLabelSearchBase64 || '';
+    if (brandInput) brandInput.value = (lastAiAnalysisResult && lastAiAnalysisResult.brand_name) ? lastAiAnalysisResult.brand_name : '';
+    if (breweryInput) breweryInput.value = (lastAiAnalysisResult && lastAiAnalysisResult.brewery_name) ? lastAiAnalysisResult.brewery_name : '';
+    if (specInput) specInput.value = (lastAiAnalysisResult && lastAiAnalysisResult.spec_name) ? lastAiAnalysisResult.spec_name : '';
+    if (prefInput) prefInput.value = '';
+    if (commentInput) commentInput.value = '';
+
+    modal.classList.add('active');
+}
+
+function closeNewProductRegisterModal() {
+    const modal = document.getElementById('newProductRegisterModal');
+    if (modal) modal.classList.remove('active');
+}
+
+async function submitNewProductAndRating() {
+    const brandName = document.getElementById('newProdBrandName')?.value.trim();
+    if (!brandName) {
+        alert('銘柄名を入力してください。');
+        return;
+    }
+    
+    const breweryName = document.getElementById('newProdBreweryName')?.value.trim() || '';
+    const specName = document.getElementById('newProdSpecName')?.value.trim() || '';
+    const prefecture = document.getElementById('newProdPrefecture')?.value.trim() || '';
+    const ssiType = document.getElementById('newProdSsiType')?.value || '薫酒';
+    const totalScore = parseFloat(document.getElementById('newProdTotalScore')?.value || 4.0);
+    const comment = document.getElementById('newProdComment')?.value.trim() || '';
+    
+    const payload = {
+        brand_name: brandName,
+        brewery_name: breweryName,
+        spec_name: specName,
+        prefecture: prefecture,
+        image: lastLabelSearchBase64,
+        comment: comment,
+        total_score: totalScore,
+        taste_score: totalScore,
+        aroma_score: totalScore,
+        ssi_type: ssiType,
+        user_name: 'ユーザー',
+        user_id: 'user_registered'
+    };
+    
+    try {
+        const res = await fetch('/api/product/create-and-rate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        if (data.status === 'success') {
+            alert('新しい日本酒とレビューを正常に登録しました！');
+            closeNewProductRegisterModal();
+            if (data.product_id && typeof showModal === 'function') {
+                showModal(data.product_id);
+            }
+        } else {
+            alert(data.message || '登録に失敗しました。');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('通信エラーが発生しました。');
+    }
+}
 </script>
 
+<style>
+.label-search-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #ffffff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.label-search-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(168, 85, 247, 0.45);
+}
+
+/* 画面右下に常時固定表示される Vivino風 フローティングカメラボタン (FAB) */
+.floating-camera-btn {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+    color: #ffffff;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.5), 0 2px 8px rgba(0,0,0,0.3);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: fabPulse 2.5s infinite ease-in-out;
+}
+.floating-camera-btn:hover {
+    transform: scale(1.06);
+    box-shadow: 0 12px 30px rgba(168, 85, 247, 0.6);
+}
+.floating-camera-btn:active {
+    transform: scale(0.94);
+}
+.floating-camera-icon {
+    width: 25px;
+    height: 25px;
+}
+.floating-camera-label {
+    font-size: 9px;
+    font-weight: 800;
+    margin-top: 1px;
+    letter-spacing: -0.2px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+@keyframes fabPulse {
+    0%, 100% {
+        box-shadow: 0 8px 24px rgba(168, 85, 247, 0.5), 0 0 0 0 rgba(168, 85, 247, 0.4);
+    }
+    50% {
+        box-shadow: 0 10px 28px rgba(168, 85, 247, 0.7), 0 0 0 10px rgba(168, 85, 247, 0);
+    }
+}
+
+.ai-label-modal {
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ai-label-modal.active {
+    opacity: 1;
+    visibility: visible;
+}
+.ai-label-modal-card {
+    background: #1e293b;
+    color: #f8fafc;
+    border-radius: 24px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ai-label-modal.active .ai-label-modal-card {
+    transform: translateY(0);
+}
+.ai-label-header {
+    padding: 18px 20px;
+    background: rgba(30, 41, 59, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.ai-label-title {
+    font-size: 16px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #818cf8, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.ai-label-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #94a3b8;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+.ai-label-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ai-scanning-box {
+    position: relative;
+    width: 100%;
+    height: 220px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #0f172a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+.ai-scanning-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.ai-scan-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, #818cf8, #c084fc, transparent);
+    box-shadow: 0 0 15px #c084fc;
+    animation: scanAnimation 2s infinite ease-in-out;
+}
+@keyframes scanAnimation {
+    0% { top: 0%; }
+    50% { top: 95%; }
+    100% { top: 0%; }
+}
+
+.ai-tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+.ai-tag {
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(129, 140, 248, 0.3);
+    color: #c7d2fe;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+.ai-tag.brand {
+    background: rgba(168, 85, 247, 0.2);
+    border-color: rgba(192, 132, 252, 0.4);
+    color: #e9d5ff;
+    font-weight: 700;
+}
+
+.vivino-result-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.vivino-card {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 12px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+.vivino-card:hover {
+    background: rgba(51, 65, 85, 0.9);
+    border-color: rgba(129, 140, 248, 0.5);
+    transform: translateY(-1px);
+}
+.vivino-card-img {
+    width: 60px;
+    height: 75px;
+    object-fit: contain;
+    background: #0f172a;
+    border-radius: 8px;
+    padding: 4px;
+    flex-shrink: 0;
+}
+.vivino-card-info {
+    flex: 1;
+    min-width: 0;
+}
+.vivino-match-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: #34d399;
+    background: rgba(52, 211, 153, 0.15);
+    padding: 2px 8px;
+    border-radius: 10px;
+    display: inline-block;
+    margin-bottom: 4px;
+}
+.vivino-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+.vivino-card-sub {
+    font-size: 12px;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vivino-card-arrow {
+    color: #64748b;
+    font-size: 18px;
+    padding-right: 4px;
+}
+</style>
+
+<!-- Vivino風 AIラベル検索 モーダル -->
+<div class="ai-label-modal" id="aiLabelModal">
+    <div class="ai-label-modal-card">
+        <div class="ai-label-header">
+            <div class="ai-label-title">
+                <span>📷 AIラベル判定結果</span>
+            </div>
+            <button class="ai-label-close" onclick="closeAiLabelModal()">&times;</button>
+        </div>
+        <div class="ai-label-body" id="aiLabelModalBody">
+            <!-- 解析中 or 判定結果が動的に挿入されます -->
+        </div>
+    </div>
+</div>
+
+<!-- Vivino風 新規日本酒登録＆評価投稿 モーダル -->
+<div class="ai-label-modal" id="newProductRegisterModal">
+    <div class="ai-label-modal-card" style="max-width: 500px;">
+        <div class="ai-label-header">
+            <div class="ai-label-title" style="background: linear-gradient(135deg, #34d399, #059669); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                <span>✨ 新しい日本酒を登録＆レビュー</span>
+            </div>
+            <button class="ai-label-close" onclick="closeNewProductRegisterModal()">&times;</button>
+        </div>
+        <div class="ai-label-body" style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; gap: 12px; align-items: center; background: rgba(15, 23, 42, 0.4); padding: 10px; border-radius: 12px;">
+                <img id="newProdImgPreview" src="" style="width: 65px; height: 65px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background:#0f172a;">
+                <div style="font-size: 12px; color: #94a3b8;">
+                    撮影したラベル写真とAI認識結果が自動入力されています。必要に応じて修正・追加入力してください。
+                </div>
+            </div>
+            
+            <div>
+                <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">銘柄名 (必須) *</label>
+                <input type="text" id="newProdBrandName" placeholder="例: 獺祭, 八海山" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">酒蔵名・蔵元</label>
+                    <input type="text" id="newProdBreweryName" placeholder="例: 旭酒造" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">特定名称・スペック</label>
+                    <input type="text" id="newProdSpecName" placeholder="例: 純米大吟醸" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+                </div>
+            </div>
+
+            <div>
+                <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">都道府県</label>
+                <input type="text" id="newProdPrefecture" placeholder="例: 山口県" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">味わいタイプ</label>
+                    <select id="newProdSsiType" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+                        <option value="薫酒">🌸 薫酒 (フルーティー・爽やか)</option>
+                        <option value="爽酒">💧 爽酒 (スッキリ・軽快)</option>
+                        <option value="醇酒">🌾 醇酒 (コク・米の旨味)</option>
+                        <option value="熟酒">🍂 熟酒 (熟成・濃厚)</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">総合評価 (5点満点)</label>
+                    <select id="newProdTotalScore" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none;">
+                        <option value="5.0">⭐️⭐️⭐️⭐️⭐️ (5.0 最高)</option>
+                        <option value="4.5">⭐️⭐️⭐️⭐️✨ (4.5)</option>
+                        <option value="4.0" selected>⭐️⭐️⭐️⭐️ (4.0 とても良い)</option>
+                        <option value="3.5">⭐️⭐️⭐️✨ (3.5)</option>
+                        <option value="3.0">⭐️⭐️⭐️ (3.0 普通)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label style="font-size: 12px; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 4px;">感想・レビューコメント</label>
+                <textarea id="newProdComment" rows="3" placeholder="香りの印象、飲んだ場所、料理との相性などを記入..." style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: #0f172a; color: #fff; outline: none; resize: vertical;"></textarea>
+            </div>
+
+            <button class="label-search-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); width: 100%; justify-content: center; padding: 12px; font-size: 15px; font-weight: 700; margin-top: 6px;" onclick="submitNewProductAndRating()">
+                ✨ この日本酒を登録して投稿する
+            </button>
+        </div>
+    </div>
+</div>
+
+    <!-- 画面右下に常時固定表示される Vivino風 フローティングカメラボタン (FAB) -->
+    <button class="floating-camera-btn" id="floatingCameraBtn" onclick="triggerLabelCamera()" title="カメラでラベルを撮影して判定">
+        <svg class="floating-camera-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        <span class="floating-camera-label">ラベル撮影</span>
+    </button>
 </body>
 </html>
